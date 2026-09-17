@@ -30,12 +30,13 @@ from app.models.transcriber_model import TranscriptResult, TranscriptSegment
 from app.services.constant import SUPPORT_PLATFORM_MAP
 from app.services.provider import ProviderService
 from app.services.screenshot_policy import apply_screenshot_policy
+from app.services.stable_frame_selector import StableFrameSelector
 from app.transcriber.base import Transcriber
 from app.transcriber.transcriber_provider import get_transcriber, _transcribers
 from app.utils.note_helper import replace_content_markers, prepend_source_link
 from app.utils.screenshot_marker import extract_screenshot_timestamps
 from app.utils.status_code import StatusCode
-from app.utils.video_helper import generate_screenshot
+from app.utils.video_helper import generate_screenshot, load_video_frame
 from app.utils.video_reader import VideoReader
 
 # ------------------ 环境变量与全局配置 ------------------
@@ -654,7 +655,12 @@ class NoteGenerator:
             )
         if "screenshot" in formats and video_path:
             try:
-                markdown = self._insert_screenshots(markdown, video_path)
+                markdown = self._insert_screenshots(
+                    markdown,
+                    video_path,
+                    content_profile=content_profile,
+                    video_duration=audio_meta.duration,
+                )
             except Exception as exc:
                 logger.warning("截图插入失败，跳过该步骤")
 
@@ -666,7 +672,13 @@ class NoteGenerator:
 
         return markdown
 
-    def _insert_screenshots(self, markdown: str, video_path: Path) -> str | None | Any:
+    def _insert_screenshots(
+        self,
+        markdown: str,
+        video_path: Path,
+        content_profile: Literal["general", "math_course"] = "general",
+        video_duration: Optional[float] = None,
+    ) -> str | None | Any:
         """
         扫描 Markdown 文本中所有 Screenshot 标记，并替换为实际生成的截图链接。
 
@@ -677,7 +689,17 @@ class NoteGenerator:
         matches: List[Tuple[str, int]] = extract_screenshot_timestamps(markdown)
         for idx, (marker, ts) in enumerate(matches):
             try:
-                img_path = generate_screenshot(str(video_path), str(IMAGE_OUTPUT_DIR), ts, idx)
+                screenshot_timestamp = ts
+                if content_profile == "math_course":
+                    # The selector itself fail-closes to ts for extraction and analysis
+                    # failures, so screenshot generation remains best-effort.
+                    screenshot_timestamp = StableFrameSelector(
+                        frame_loader=lambda timestamp: load_video_frame(str(video_path), timestamp),
+                        video_duration=video_duration if video_duration is not None else ts,
+                    ).select(ts)
+                img_path = generate_screenshot(
+                    str(video_path), str(IMAGE_OUTPUT_DIR), screenshot_timestamp, idx
+                )
                 filename = Path(img_path).name
                 # 构建前端可访问的 URL，例如 /static/screenshots/{filename}
                 img_url = f"{IMAGE_BASE_URL.rstrip('/')}/{filename}"

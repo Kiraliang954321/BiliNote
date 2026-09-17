@@ -8,6 +8,20 @@ import unittest
 from unittest.mock import patch
 
 
+_STUB_MODULE_NAMES = (
+    "app",
+    "app.utils",
+    "app.utils.logger",
+    "app.utils.path_helper",
+    "ffmpeg",
+    "PIL",
+    "PIL.Image",
+    "PIL.ImageDraw",
+    "PIL.ImageFont",
+)
+_MISSING = object()
+
+
 def _install_stubs():
     app_mod = types.ModuleType("app")
     utils_pkg = types.ModuleType("app.utils")
@@ -79,15 +93,23 @@ def _install_stubs():
 
 
 def _load_video_reader_module():
+    previous_modules = {name: sys.modules.get(name, _MISSING) for name in _STUB_MODULE_NAMES}
     _install_stubs()
-    root = pathlib.Path(__file__).resolve().parents[1]
-    module_path = root / "app" / "utils" / "video_reader.py"
-    spec = importlib.util.spec_from_file_location("video_reader", module_path)
-    if spec is None or spec.loader is None:
-        raise ImportError("video_reader module spec not found")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    try:
+        root = pathlib.Path(__file__).resolve().parents[1]
+        module_path = root / "app" / "utils" / "video_reader.py"
+        spec = importlib.util.spec_from_file_location("video_reader", module_path)
+        if spec is None or spec.loader is None:
+            raise ImportError("video_reader module spec not found")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        for name, previous_module in previous_modules.items():
+            if previous_module is _MISSING:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous_module
 
 
 video_reader_module = _load_video_reader_module()

@@ -1,5 +1,8 @@
+import io
 import shutil
 from pathlib import Path
+
+from PIL import Image
 
 from dotenv import load_dotenv
 import subprocess
@@ -12,6 +15,27 @@ BACKEND_PORT= os.getenv("BACKEND_PORT", 8483)
 BACKEND_BASE_URL = f"{api_path}:{BACKEND_PORT}"
 
 from typing import Optional
+
+
+def load_video_frame(video_path: str, timestamp: float) -> Image.Image:
+    """Load one frame for local analysis using the existing ffmpeg dependency."""
+    command = [
+        "ffmpeg",
+        "-ss", str(timestamp),
+        "-i", str(video_path),
+        "-frames:v", "1",
+        "-f", "image2pipe",
+        "-vcodec", "png",
+        "pipe:1",
+        "-y",
+    ]
+    result = subprocess.run(command, capture_output=True)
+    if result.returncode != 0 or not result.stdout:
+        raise RuntimeError("ffmpeg frame extraction failed")
+    with Image.open(io.BytesIO(result.stdout)) as image:
+        return image.convert("RGB").copy()
+
+
 def generate_screenshot(video_path: str, output_dir: str, timestamp: int, index: int) -> str:
     """
     使用 ffmpeg 生成截图，返回生成图片路径
