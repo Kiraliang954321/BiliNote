@@ -1029,7 +1029,7 @@ Codex Investigation / RCA / Architecture / Task Contract
 
 当前 Docker 使用官方镜像，只覆盖前端。
 
-`WI-MATH-01/02/03` 已经在源码仓库实现并通过 Codex Review，但当前运行容器仍是官方 backend，因此生产验收前必须明确选择一种后端部署方式，例如：
+`WI-MATH-01/02/03/04` 已经在源码仓库实现并通过 Codex Review，但当前运行容器仍是官方 backend，因此生产验收前必须明确选择一种后端部署方式，例如：
 
 ```text
 方案 1：基于 source 构建本地完整 Docker 镜像
@@ -1051,7 +1051,7 @@ scene-cut threshold: 0.18
 analysis size: 320x180 grayscale
 ```
 
-这些仍属于首版工程阈值，需要在真实数学视频回归中校准；`WI-MATH-04` 还需冻结并校准 dHash distance / mean pixel delta 等感知去重阈值。
+这些仍属于首版工程阈值，需要在真实数学视频回归中校准。`WI-MATH-04` 已冻结并实现感知去重首版阈值：相邻帧 `dHash Hamming <= 2` 且归一化灰度 mean pixel delta `<= 0.006` 才视为同一 visual state；后续仍需用真实数学视频校准。
 
 #### C. Windows 主机当前 PATH 中没有 ffmpeg
 
@@ -1086,17 +1086,18 @@ WI-MATH-02 Screenshot Intent Policy
   checkpoint: 8308296
 WI-MATH-03 Stable Frame Selector
   checkpoint: 60f22c3
+WI-MATH-04 Perceptual Sampling Dedupe
+  checkpoint: 81bc67d
 ```
 
 当前下一项已经确定，不重新做架构讨论：
 
 ```text
-WI-MATH-04 Perceptual Sampling Dedupe
 WI-MATH-05 Math Prompt + UI Preset
 WI-MATH-06 Real Math Course Acceptance
 ```
 
-`WI-MATH-04` 只处理给 AI 的视觉采样相邻感知去重：使用保守阈值识别相似 visual-state cluster，并保留簇中较晚帧；不得改变 `WI-MATH-02` 最终截图密度策略，也不得修改 `WI-MATH-03` StableFrameSelector 的最终截帧选择语义。
+`WI-MATH-05` 只处理数学课程 Prompt 与 Web UI preset：让模型减少普通公式/推导截图、优先题目原图/几何图/函数图/关键完整板书，并保持 `content_profile` 与 `style` 独立；不得改变 `WI-MATH-02/03/04` 已冻结的后处理、稳定帧和视觉采样语义。
 
 Integration 注意：
 
@@ -1137,7 +1138,7 @@ G:\Project\bilinote
 G:\Project\bilinote\source
 
 当前分支：master
-当前实现 checkpoint：60f22c3
+当前实现 checkpoint：81bc67d
 
 请先读取：
 G:\Project\bilinote\source\MATH_COURSE_MODE_DESIGN.md
@@ -1184,8 +1185,8 @@ G:\Project\bilinote\启动说明书.md
 请继续遵循现有 Phase 20 / Codex-Pi 工作流：
 先调查真实磁盘/Git/容器状态；Codex 负责 Investigation/RCA/Architecture/Task Contract/Review/Integration；非平凡代码实现交给 pi_worker，禁止 blind retry。
 
-下一步已经确定：从 WI-MATH-04 — Perceptual Sampling Dedupe 开始，不要重新从头设计。
-WI-MATH-04 只处理给 AI 的视觉采样相邻感知去重：保守判断相似 visual-state cluster，并保留较晚帧；不得改变 WI-MATH-02 最终截图 hard-cap/min-gap 逻辑，也不得改变 WI-MATH-03 StableFrameSelector 的最终截帧语义。完成 Codex Review 后再进入 WI-MATH-05。
+下一步已经确定：从 WI-MATH-05 — Math Prompt + UI Preset 开始，不要重新从头设计。
+WI-MATH-05 只处理 math_course Prompt 与 Web UI preset：减少普通公式/推导截图，优先完整题目原图、几何图、函数图和关键完整板书；content_profile 与 style 保持独立。不得改变 WI-MATH-02 ScreenshotPolicy、WI-MATH-03 StableFrameSelector、WI-MATH-04 感知采样去重语义。完成 Codex Review 后再进入 WI-MATH-06。
 
 最终验收目标：约 7 分钟数学课程最终截图 <= 6，避免连续重复和未写完板书，同时关键视觉内容保留，general 模式不回归。
 ```

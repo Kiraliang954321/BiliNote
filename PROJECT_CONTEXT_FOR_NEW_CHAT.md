@@ -2,7 +2,7 @@
 
 > 用途：把本文件内容直接复制到新的 ChatGPT 对话中，即可继续当前项目。
 > 整理时间：2026-09-17
-> 数学课程模式当前实现 checkpoint：`60f22c3`
+> 数学课程模式当前实现 checkpoint：`81bc67d`
 > 新聊天开始后必须重新核对真实 Git / Docker 状态，不要只依赖本文件中的时间点信息。
 
 ## 可直接复制到新聊天
@@ -14,7 +14,7 @@
 部署根目录：G:\Project\bilinote
 源码 Git 仓库：G:\Project\bilinote\source
 Git 分支：master
-数学课程模式当前实现 checkpoint：60f22c3
+数学课程模式当前实现 checkpoint：81bc67d
 
 新聊天开始后，请先真实执行：
 - git status --short
@@ -90,6 +90,15 @@ Git 分支：master
    - selector 失败回退原 intent timestamp；general 不做稳定帧搜索。
    - 22 个 focused/compatibility tests PASS。
    - checkpoint：60f22c3 feat(math-course): add stable frame selector
+
+9. 已完成 WI-MATH-04 — Perceptual Sampling Dedupe。
+   - general 保持原 exact-MD5 相邻去重行为。
+   - math_course 改用相邻感知相似度：dHash Hamming <= 2 且 normalized grayscale mean delta <= 0.006。
+   - 相似 visual-state cluster 保留最后一帧。
+   - 只比较时间上相邻帧，避免误删隔很久后再次出现的相同板书。
+   - 感知分析失败 fail-open：保留两帧并继续处理，不让可选去重优化阻断视频流程。
+   - 27 个 focused/compatibility tests PASS。
+   - checkpoint：81bc67d feat(math-course): add perceptual sampling dedupe
 
 【当前架构】
 部署目录本身不是 Git 仓库：
@@ -198,7 +207,7 @@ AI 指定的大致时间 ≠ 最终实际截帧时间。
 【尚未解决的问题】
 1. 后端自定义代码的生产部署方式还未最终冻结。
    当前 Docker 仍使用官方 backend，只覆盖前端。
-   `WI-MATH-01/02/03` 已在源码仓库实现，但当前生产容器尚未运行这些 backend 改动。
+   `WI-MATH-01/02/03/04` 已在源码仓库实现，但当前生产容器尚未运行这些 backend 改动。
    后续 Integration 必须明确：
    - 构建本地完整 Docker 镜像；或
    - 开发阶段 bind mount backend，稳定后再固化镜像。
@@ -208,9 +217,10 @@ AI 指定的大致时间 ≠ 最终实际截帧时间。
    StableFrameSelector 当前工程阈值：
    - scene-cut threshold = 0.18
    - settled motion threshold = 0.03
-   WI-MATH-04 还需冻结：
-   - dHash distance
-   - mean pixel delta
+   Perceptual Sampling Dedupe 当前工程阈值：
+   - dHash Hamming distance <= 2
+   - normalized grayscale mean pixel delta <= 0.006
+   这些阈值后续都需要用真实数学课程样本回归校准。
 
 3. Windows 主机当前 PATH 中没有 ffmpeg。
    - Pillow/numpy 可用。
@@ -227,20 +237,19 @@ AI 指定的大致时间 ≠ 最终实际截帧时间。
 
 【下一步计划】
 不要重新做架构设计，直接从：
-WI-MATH-04 — Perceptual Sampling Dedupe
+WI-MATH-05 — Math Prompt + UI Preset
 开始。
 
-WI-MATH-04 目标：
-- 只改给 AI 的 Visual Context Sampling 去重。
-- 使用保守的相邻感知相似度，而不是 JPG MD5 exact match。
-- 相似 visual-state cluster 保留最后一张，而不是第一张。
-- 冻结 dHash distance / mean pixel delta 首版阈值，并集中配置。
-- general 必须保持原有采样行为。
-- 不改变 WI-MATH-02 最终截图 hard cap/min-gap。
-- 不改变 WI-MATH-03 StableFrameSelector 的最终截帧语义。
+WI-MATH-05 目标：
+- 只处理 math_course Prompt 与 Web UI preset。
+- 普通公式、定义、推导优先 LaTeX，不用截图替代。
+- 截图优先完整题目原图、几何图、函数图/坐标图、关键完整板书。
+- 禁止枚举每个可见时间点或连续输出 Screenshot marker。
+- 同一知识点只选一个代表 intent，优先老师完成书写后的时刻。
+- content_profile 与 style 保持独立，不自动把 style 改成 academic。
+- 不改变 WI-MATH-02 ScreenshotPolicy、WI-MATH-03 StableFrameSelector、WI-MATH-04 感知采样去重语义。
 
 后续顺序：
-WI-MATH-05 — Math Prompt + UI Preset
 WI-MATH-06 — Real Math Course Acceptance
 
 Integration 约束：
@@ -266,5 +275,5 @@ Codex Review 后如有 bounded findings，最多一次批量 pi_fix；不要一�
 - Docker HTTP 200。
 - data/config/static/models 持久化不受影响。
 
-请从 WI-MATH-04 — Perceptual Sampling Dedupe 开始工作。
+请从 WI-MATH-05 — Math Prompt + UI Preset 开始工作。
 ```
