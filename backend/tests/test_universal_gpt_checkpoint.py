@@ -120,6 +120,39 @@ class _DummyClient:
 
 
 class TestUniversalGPTCheckpoint(unittest.TestCase):
+    def test_source_signature_differs_by_content_profile(self):
+        gpt = UniversalGPT(_DummyClient(), model="mock-model")
+
+        def source(profile):
+            value = types.SimpleNamespace()
+            value.title = "title"
+            value.tags = "tag"
+            value._format = []
+            value.style = "minimal"
+            value.extras = None
+            value.content_profile = profile
+            value.video_img_urls = []
+            value.segment = [types.SimpleNamespace(start=0, end=1, text="segment")]
+            return value
+
+        self.assertNotEqual(
+            gpt._build_source_signature(source("general")),
+            gpt._build_source_signature(source("math_course")),
+        )
+
+    def test_source_signature_defaults_missing_profile_to_general(self):
+        gpt = UniversalGPT(_DummyClient(), model="mock-model")
+        source = types.SimpleNamespace(
+            title="title", tags="tag", _format=[], style="minimal", extras=None,
+            video_img_urls=[], segment=[types.SimpleNamespace(start=0, end=1, text="segment")],
+        )
+        general_source = types.SimpleNamespace(**vars(source), content_profile="general")
+
+        self.assertEqual(
+            gpt._build_source_signature(source),
+            gpt._build_source_signature(general_source),
+        )
+
     def test_merge_524_error_persists_checkpoint(self):
         original_attempts = os.environ.get("OPENAI_RETRY_ATTEMPTS")
         os.environ["OPENAI_RETRY_ATTEMPTS"] = "1"

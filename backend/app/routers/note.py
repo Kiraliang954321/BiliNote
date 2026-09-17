@@ -3,7 +3,7 @@ import json
 import os
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File
@@ -46,6 +46,7 @@ class VideoRequest(BaseModel):
     task_id: Optional[str] = None
     format: Optional[list] = []
     style: str = None
+    content_profile: Literal["general", "math_course"] = "general"
     extras: Optional[str]=None
     video_understanding: Optional[bool] = False
     video_interval: Optional[int] = 0
@@ -124,7 +125,7 @@ def _persist_prefetched_transcript(task_id: str, transcript: dict) -> None:
 def run_note_task(task_id: str, video_url: str, platform: str, quality: DownloadQuality,
                   link: bool = False, screenshot: bool = False, model_name: str = None, provider_id: str = None,
                   _format: list = None, style: str = None, extras: str = None, video_understanding: bool = False,
-                  video_interval=0, grid_size=[]
+                  video_interval=0, grid_size=[], content_profile: Literal["general", "math_course"] = "general"
                   ):
 
     if not model_name or not provider_id:
@@ -146,6 +147,7 @@ def run_note_task(task_id: str, video_url: str, platform: str, quality: Download
             video_understanding=video_understanding,
             video_interval=video_interval,
             grid_size=grid_size,
+            content_profile=content_profile,
         )
 
     logger.info(f"任务进入执行队列 (task_id={task_id})")
@@ -237,7 +239,8 @@ def generate_note(data: VideoRequest, background_tasks: BackgroundTasks):
 
         background_tasks.add_task(run_note_task, task_id, data.video_url, data.platform, data.quality, data.link,
                                   data.screenshot, data.model_name, data.provider_id, data.format, data.style,
-                                  data.extras, data.video_understanding, data.video_interval, data.grid_size)
+                                  data.extras, data.video_understanding, data.video_interval, data.grid_size,
+                                  data.content_profile)
         return R.success({"task_id": task_id})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

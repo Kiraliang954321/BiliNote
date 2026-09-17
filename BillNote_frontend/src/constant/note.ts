@@ -14,6 +14,11 @@ export const noteFormats = [
   { label: 'AI总结', value: 'summary' },
 ] as const
 
+export const contentProfiles = [
+  { label: '通用', value: 'general' },
+  { label: '数学课程', value: 'math_course' },
+] as const
+
 export const noteStyles = [
   { label: '精简', value: 'minimal' },
   { label: '详细', value: 'detailed' },

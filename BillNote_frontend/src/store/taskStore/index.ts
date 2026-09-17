@@ -53,6 +53,7 @@ export interface Task {
     quality: string
     model_name: string
     provider_id: string
+    content_profile?: 'general' | 'math_course'
   }
 }
 

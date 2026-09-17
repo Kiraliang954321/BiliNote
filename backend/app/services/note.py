@@ -3,7 +3,7 @@ import logging
 import os
 from dataclasses import asdict
 from pathlib import Path
-from typing import List, Optional, Tuple, Union, Any
+from typing import List, Literal, Optional, Tuple, Union, Any
 
 from fastapi import HTTPException
 from pydantic import HttpUrl
@@ -96,6 +96,7 @@ class NoteGenerator:
         video_understanding: bool = False,
         video_interval: int = 0,
         grid_size: Optional[List[int]] = None,
+        content_profile: Literal["general", "math_course"] = "general",
     ) -> NoteResult | None:
         """
         主流程：按步骤依次下载、转写、GPT 总结、截图/链接处理、存库、返回 NoteResult。
@@ -211,6 +212,7 @@ class NoteGenerator:
                 style=style,
                 extras=extras,
                 video_img_urls=self.video_img_urls,
+                content_profile=content_profile,
             )
 
             # 4. 截图 & 链接替换
@@ -579,7 +581,8 @@ class NoteGenerator:
         formats: List[str],
         style: Optional[str],
         extras: Optional[str],
-            video_img_urls: List[str],
+        video_img_urls: List[str],
+        content_profile: Literal["general", "math_course"] = "general",
     ) -> str | None:
         """
         调用 GPT 对转写结果进行总结，生成 Markdown 文本并缓存。
@@ -608,6 +611,7 @@ class NoteGenerator:
             _format=formats,
             style=style,
             extras=extras,
+            content_profile=content_profile,
             checkpoint_key=task_id,
         )
 

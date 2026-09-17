@@ -10,6 +10,7 @@ export const generateNote = async (data: {
   task_id?: string
   format: Array<string>
   style: string
+  content_profile: 'general' | 'math_course'
   extras?: string
   video_understand?: boolean
   video_interval?: number

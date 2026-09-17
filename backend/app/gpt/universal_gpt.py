@@ -109,6 +109,7 @@ class UniversalGPT(GPT):
             "format": source._format,
             "style": source.style,
             "extras": source.extras,
+            "content_profile": getattr(source, "content_profile", "general"),
             "video_img_urls": source.video_img_urls or [],
             "segments": [
                 {

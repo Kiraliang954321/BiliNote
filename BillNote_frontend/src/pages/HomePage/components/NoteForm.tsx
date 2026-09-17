@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/select.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
-import { noteStyles, noteFormats, videoPlatforms } from '@/constant/note.ts'
+import { contentProfiles, noteStyles, noteFormats, videoPlatforms } from '@/constant/note.ts'
 import { fetchModels } from '@/services/model.ts'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -55,6 +55,7 @@ const formSchema = z
     model_name: z.string().nonempty('请选择模型'),
     format: z.array(z.string()).default([]),
     style: z.string().nonempty('请选择笔记生成风格'),
+    content_profile: z.enum(['general', 'math_course']).default('general'),
     extras: z.string().optional(),
     video_understanding: z.boolean().optional(),
     video_interval: z.coerce.number().min(1).max(30).default(6).optional(),
@@ -148,6 +149,7 @@ const NoteForm = () => {
       quality: 'medium',
       model_name: modelList[0]?.model_name || '',
       style: 'minimal',
+      content_profile: 'general',
       video_interval: 6,
       grid_size: [2, 2],
       format: [],
@@ -180,6 +182,7 @@ const NoteForm = () => {
       video_url: formData.video_url || '',
       model_name: formData.model_name || modelList[0]?.model_name || '',
       style: formData.style || 'minimal',
+      content_profile: formData.content_profile === 'math_course' ? 'math_course' : 'general',
       quality: formData.quality || 'medium',
       extras: formData.extras || '',
       screenshot: formData.screenshot ?? false,
@@ -474,6 +477,30 @@ const NoteForm = () => {
               )}
             />
           </div>
+          <FormField
+            control={form.control}
+            name="content_profile"
+            render={({ field }) => (
+              <FormItem>
+                <SectionHeader title="内容模式" tip="选择内容所属模式，不会改变笔记风格" />
+                <Select value={field.value} onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="w-full min-w-0 truncate">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {contentProfiles.map(({ label, value }) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
           {/* 视频理解 */}
           <SectionHeader title="视频理解" tip="将视频截图发给多模态模型辅助分析" />
           <div className="flex flex-col gap-2">
