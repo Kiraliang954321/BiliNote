@@ -1,0 +1,18 @@
+services:
+  bilinote:
+    image: ghcr.io/kiraliang954321/bilinote:${BILINOTE_TAG:-latest}
+    container_name: bilinote
+    ports:
+      - "${APP_PORT:-3015}:80"
+    volumes:
+      - bilinote-data:/app/backend/data
+      - bilinote-config:/app/backend/config
+      - bilinote-static:/app/backend/static
+      - bilinote-models:/app/backend/models
+    restart: unless-stopped
+
+volumes:
+  bilinote-data:
+  bilinote-config:
+  bilinote-static:
+  bilinote-models:
