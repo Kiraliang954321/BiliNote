@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Bubble, Sender } from '@ant-design/x'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Trash2, ChevronDown, ChevronUp, BookOpen, UserRound, Bot, Maximize2, Minimize2 } from 'lucide-react'
@@ -9,6 +11,7 @@ import { toast } from 'react-hot-toast'
 import { useChatStore } from '@/store/chatStore'
 import { useTaskStore } from '@/store/taskStore'
 import { askQuestion, getChatStatus, indexTask, type ChatSource, type IndexStatus } from '@/services/chat'
+import { normalizeMathDelimiters } from '@/utils/markdownmath'
 
 type ChatMode = 'half' | 'full'
 
@@ -184,8 +187,11 @@ export default function ChatPanel({ taskId, mode, onModeChange }: ChatPanelProps
         variant: 'outlined' as const,
         contentRender: (content: any) => (
           <div className="markdown-body prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-headings:my-2">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {typeof content === 'string' ? content : String(content)}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+            >
+              {normalizeMathDelimiters(typeof content === 'string' ? content : String(content))}
             </ReactMarkdown>
           </div>
         ),
