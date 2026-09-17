@@ -2,7 +2,7 @@
 
 > 用途：把本文件内容直接复制到新的 ChatGPT 对话中，即可继续当前项目。
 > 整理时间：2026-09-17
-> 当前源码 HEAD：`272448e`；数学课程模式当前实现 checkpoint：`9fe5271`
+> GHCR/公共 Docker 发布实现 checkpoint：`272448e`；数学课程模式实现 checkpoint：`9fe5271`
 > 新聊天开始后必须重新核对真实 Git / Docker 状态，不要只依赖本文件中的时间点信息。
 
 ## 可直接复制到新聊天
@@ -14,7 +14,7 @@
 部署根目录：G:\Project\bilinote
 源码 Git 仓库：G:\Project\bilinote\source
 Git 分支：master
-当前源码 HEAD：272448e
+GHCR/公共 Docker 发布实现 checkpoint：272448e
 数学课程模式实现 checkpoint：9fe5271
 
 新聊天开始后，请先真实执行：
@@ -122,7 +122,7 @@ Git 分支：master
    - checkpoint：9fe5271 fix(math-course): preserve latex in real acceptance
 
 12. 已完成公共 Docker/GHCR 发布验证。
-   - GitHub 仓库：Kiraliang954321/BiliNote；当前源码 HEAD：272448e（数学课程实现 checkpoint 仍为 9fe5271）。
+   - GitHub 仓库：Kiraliang954321/BiliNote；GHCR/公共 Docker 发布实现 checkpoint：272448e（数学课程实现 checkpoint 仍为 9fe5271）。
    - 公共镜像：ghcr.io/kiraliang954321/bilinote；匿名拉取 `latest` 和 `1.0.0` 均已验证，两个标签均提供 linux/amd64 和 linux/arm64。
    - `latest` 发布 run 35208721814 SUCCESS；`1.0.0` 发布 run 35211237300 SUCCESS；版本镜像仓库 digest：sha256:8560d86d42cbba6618756e3e1943aaf41b8f015782d47dcb17c06a71ed271abb。
 
