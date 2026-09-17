@@ -11,11 +11,11 @@
 ## Current State
 
 - `Dockerfile.complete` 已能构建完整单镜像：backend + frontend + nginx + ffmpeg。
-- `.github/workflows/docker-build.yml` 已存在，并使用 `Dockerfile.complete` 与 `ghcr.io/${{ github.repository }}`。
-- 当前 Docker workflow 只监听 `v*` tag 和手动触发；同时仓库的 desktop/extension release workflow 也监听 `v*`，直接继续使用相同 tag 会造成发布耦合。
-- 当前 workflow 声明 `linux/amd64,linux/arm64`，但没有显式安装 QEMU。
+- `.github/workflows/docker-build.yml` 已存在，并使用 `Dockerfile.complete` 与 `ghcr.io/kiraliang954321/bilinote`。
+- Docker workflow 监听 `master`、`docker-v*` tag 和手动触发；Docker 专用 tag 避免与同样监听 `v*` 的 desktop/extension release workflow 耦合。
+- 发布使用两个原生 GitHub-hosted runner：`ubuntu-24.04` 构建 `linux/amd64`，`ubuntu-24.04-arm` 构建 `linux/arm64`；不使用 QEMU。
 - 当前 `docker-compose.yml` 是开发栈：backend/frontend/nginx 分离、本地 build、backend bind mount。它不应被替换成最终用户发布配置。
-- README 中 Docker 快速开始仍主要指向上游 `ghcr.io/jefferyhcool/bilinote`。
+- README 中 Docker 快速开始已使用本 fork 的发布 Compose/GHCR 镜像 `ghcr.io/kiraliang954321/bilinote:latest`。
 
 ## Approaches Considered
 
@@ -82,14 +82,15 @@ docker-v1.0.0
 GitHub Actions 构建顺序：
 
 ```text
-checkout
--> setup QEMU
--> setup Buildx
--> login GHCR with GITHUB_TOKEN
--> docker metadata
--> build Dockerfile.complete
--> push amd64/arm64 manifest
+matrix: ubuntu-24.04 builds linux/amd64; ubuntu-24.04-arm builds linux/arm64 (parallel)
+-> each runner: checkout -> setup Buildx -> login GHCR with GITHUB_TOKEN
+-> each runner: build Dockerfile.complete and push a canonical digest
+-> upload each digest artifact
+-> merge job: download digests -> docker metadata -> imagetools create final tags
+-> imagetools inspect the published manifest
 ```
+
+每个平台使用独立的 GHA cache scope，避免跨架构缓存碰撞。最终 merge job 只把两个 digest 合成为 `latest`、版本和 `sha-*` 标签，因此公开 manifest 仅包含 `linux/amd64` 与 `linux/arm64`。
 
 权限保持最小化：
 
@@ -106,6 +107,8 @@ packages: write
 - `1.0.0`: 来自 `docker-v1.0.0`，用于固定版本部署。
 - `1.0`: 同一个 semver release 的 major.minor 标签。
 - `sha-<shortsha>`: 每次构建的不可变 Git 对应标签，用于精确回滚与验收。
+
+merge job 从 `docker-v*` ref name 去除 `docker-v` 前缀后，将结果作为 `docker/metadata-action` 的 semver `value`。两条 semver 规则都只在该 value 非空时启用；因此 `docker-v1.2.3` 生成 `1.2.3` 和 `1.2`，但不生成 major-only `1`。master 和手动触发传入空值，不生成 semver 标签。metadata 配置 `flavor.latest=false`，所以 `latest` 只由显式的 `type=raw,value=latest` 规则生成；所有触发方式均生成 `latest` 和 `sha-*`。
 
 `Dockerfile.complete` 的 `VITE_APP_VERSION`：
 

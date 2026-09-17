@@ -4,9 +4,9 @@
 
 **Goal:** Publish this BiliNote fork as a public multi-architecture GHCR image and provide a release Compose path that lets users deploy it with Docker without building source locally.
 
-**Architecture:** Reuse the existing `.github/workflows/docker-build.yml` and `Dockerfile.complete`. Keep the existing development `docker-compose.yml` unchanged, add a separate `docker-compose.release.yml` that consumes `ghcr.io/kiraliang954321/bilinote`, and update README deployment instructions to point users at the fork image and release Compose. Docker releases use `docker-v*` tags to avoid triggering existing desktop/extension `v*` workflows.
+**Architecture:** Reuse the existing `.github/workflows/docker-build.yml` and `Dockerfile.complete`. Build `linux/amd64` and `linux/arm64` independently and in parallel on native GitHub-hosted runners, upload their canonical digests, and merge them into final GHCR tags in a separate job. Keep the existing development `docker-compose.yml` unchanged, add a separate `docker-compose.release.yml` that consumes `ghcr.io/kiraliang954321/bilinote`, and update README deployment instructions to point users at the fork image and release Compose. Docker releases use `docker-v*` tags to avoid triggering existing desktop/extension `v*` workflows.
 
-**Tech Stack:** GitHub Actions, Docker Buildx, QEMU, GHCR, Docker Compose, Markdown.
+**Tech Stack:** GitHub Actions, Docker Buildx, native GitHub-hosted runners, GHCR, Docker Compose, Markdown.
 
 **Spec:** `docs/superpowers/specs/2026-09-17-ghcr-docker-release-design.md`
 
@@ -16,7 +16,9 @@
 - Preserve the existing development `docker-compose.yml`; do not replace it with release deployment configuration.
 - Reuse `.github/workflows/docker-build.yml`; do not create a second parallel Docker publish workflow.
 - Docker release tags use `docker-v*`, not `v*`, because desktop and extension workflows already listen to `v*`.
-- Published platforms are `linux/amd64` and `linux/arm64`.
+- Published platforms are only `linux/amd64` and `linux/arm64`; build them natively on `ubuntu-24.04` and `ubuntu-24.04-arm`, respectively, without QEMU.
+- Push each platform by digest/canonical name, hand off digests with workflow artifacts, then create and inspect the final manifest in a separate merge job.
+- Use architecture-scoped GHA caches to prevent cross-architecture cache collisions.
 - Use repository `GITHUB_TOKEN`; do not introduce a PAT secret.
 - Release Compose defaults to host port `3015` and four persistent Docker volumes for `/app/backend/data`, `/app/backend/config`, `/app/backend/static`, and `/app/backend/models`.
 - Do not add installer scripts, Kubernetes/Helm, Docker Hub publishing, or application business-logic changes.
@@ -63,27 +65,42 @@ env:
   IMAGE_NAME: kiraliang954321/bilinote
 ```
 
-Add QEMU before Buildx:
+Replace the single multi-platform/QEMU build with a matrix build job and a separate manifest merge job. The matrix must contain exactly:
 
 ```yaml
-- name: Set up QEMU
-  uses: docker/setup-qemu-action@v3
+include:
+  - platform: linux/amd64
+    runner: ubuntu-24.04
+    artifact: amd64
+  - platform: linux/arm64
+    runner: ubuntu-24.04-arm
+    artifact: arm64
 ```
 
-Configure metadata so builds produce:
+Each matrix runner sets up Buildx (without `docker/setup-qemu-action`), logs into GHCR with `GITHUB_TOKEN`, and builds `Dockerfile.complete` with:
+
+```yaml
+platforms: ${{ matrix.platform }}
+outputs: type=image,name=ghcr.io/kiraliang954321/bilinote,push-by-digest=true,name-canonical=true,push=true
+cache-from: type=gha,scope=${{ matrix.artifact }}
+cache-to: type=gha,mode=max,scope=${{ matrix.artifact }}
+```
+
+Export the resulting digest to a file and upload it with `actions/upload-artifact@v4`. A merge job on `ubuntu-24.04` downloads both artifacts with `actions/download-artifact@v4`. It resolves `${GITHUB_REF_NAME#docker-v}` only for `refs/tags/docker-v*` (and an empty value for master/manual runs), then runs `docker/metadata-action@v5` with:
 
 ```yaml
 tags: |
   type=raw,value=latest
-  type=match,pattern=docker-v(.*),group=1
+  type=semver,pattern={{version}},value=${{ steps.docker-version.outputs.version }},enable=${{ steps.docker-version.outputs.version != '' }}
+  type=semver,pattern={{major}}.{{minor}},value=${{ steps.docker-version.outputs.version }},enable=${{ steps.docker-version.outputs.version != '' }}
   type=sha,prefix=sha-
+flavor: |
+  latest=false
 ```
 
-Keep:
+The explicit raw rule is the sole source of `latest`: master and manual runs produce `latest` plus `sha-*`, while `docker-v1.2.3` also produces `1.2.3` and `1.2`.
 
-```yaml
-platforms: linux/amd64,linux/arm64
-```
+Then use `docker buildx imagetools create with both canonical digest references to apply those final tags, and run `docker buildx imagetools inspect ghcr.io/kiraliang954321/bilinote:latest` to verify the published manifest.
 
 Update version resolution to strip `docker-v`:
 
@@ -107,10 +124,18 @@ http://localhost:3015
 Run:
 
 ```powershell
-Select-String -Path .github\workflows\docker-build.yml -Pattern "docker-v|branches:|master|setup-qemu|linux/amd64,linux/arm64|kiraliang954321/bilinote"
+Select-String -Path .github\workflows\docker-build.yml -Pattern "docker-v|type=semver|branches:|master|ubuntu-24.04-arm|linux/amd64|linux/arm64|push-by-digest|name-canonical|upload-artifact|download-artifact|imagetools create|kiraliang954321/bilinote"
 ```
 
-Expected: all listed release properties are present.
+Expected: all listed native-build and manifest-merge properties are present.
+
+Run:
+
+```powershell
+if (Select-String -Path .github\workflows\docker-build.yml -Pattern "setup-qemu") { throw "QEMU must not be configured" }
+```
+
+Expected: exits 0.
 
 Run:
 
@@ -442,7 +467,7 @@ $runId = gh run list --workflow docker-build.yml --limit 1 --json databaseId --j
 gh run watch $runId --exit-status
 ```
 
-Expected: build-and-push succeeds for both `linux/amd64` and `linux/arm64` and pushes a manifest.
+Expected: the two native matrix builds succeed for `linux/amd64` and `linux/arm64`; the merge-manifest job creates and inspects their combined manifest.
 
 If `gh` is unavailable or not authenticated, inspect the workflow run through GitHub web UI; do not claim success without the remote result.
 
