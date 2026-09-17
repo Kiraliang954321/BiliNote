@@ -43,6 +43,17 @@ class TestMathCoursePrompt(unittest.TestCase):
         self.assertIn("45 秒", prompt)
         self.assertIn("*Screenshot-[mm:ss]", prompt)
 
+    def test_math_course_requires_renderable_latex_delimiters_not_code_spans(self):
+        for screenshot_format in ([], ["screenshot"]):
+            prompt = generate_base_prompt(
+                "Calculus", "00:00 - derivative", "math", _format=screenshot_format,
+                content_profile="math_course",
+            )
+
+            self.assertIn("行内公式使用 `$...$`", prompt)
+            self.assertIn("展示公式和推导使用 `$$...$$`", prompt)
+            self.assertIn("不要将 LaTeX 公式或命令放在 Markdown 反引号或代码跨度中", prompt)
+
     def test_math_course_without_screenshot_keeps_latex_rule_only(self):
         prompt = generate_base_prompt(
             "Calculus", "00:00 - derivative", "math", _format=[],

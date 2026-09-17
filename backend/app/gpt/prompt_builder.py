@@ -44,6 +44,8 @@ def generate_base_prompt(title, segment_text, tags, _format=None, style=None, ex
 
 ### 数学课程截图与公式规则
 - 普通公式、定义和推导必须使用 LaTeX/Markdown 记录，不要用截图替代。
+- 行内公式使用 `$...$`；展示公式和推导使用 `$$...$$`。
+- 不要将 LaTeX 公式或命令放在 Markdown 反引号或代码跨度中。
 - 截图主要用于完整题目图片、几何图形、函数/坐标图、关键完整板书，或确有必要的完整页推导。
 - 不要逐一枚举每个可见时间戳，也不要连续输出 Screenshot 标记；每个知识点一张代表性截图即可。
 - 优先选择书写完成后的画面；避免书写中、擦除中、翻页中或被遮挡的中间状态。
@@ -55,6 +57,8 @@ def generate_base_prompt(title, segment_text, tags, _format=None, style=None, ex
 
 ### 数学课程公式规则
 - 普通公式、定义和推导必须使用 LaTeX/Markdown 记录，不要用截图替代。
+- 行内公式使用 `$...$`；展示公式和推导使用 `$$...$$`。
+- 不要将 LaTeX 公式或命令放在 Markdown 反引号或代码跨度中。
 '''
 
     # 添加额外内容
