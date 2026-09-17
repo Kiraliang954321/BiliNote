@@ -19,6 +19,12 @@ class TestScreenshotMarker(unittest.TestCase):
         matches = extract_screenshot_timestamps(markdown)
         self.assertEqual(matches, [("*Screenshot-[01:02]", 62)])
 
+    def test_extract_consumes_trailing_emphasis_star(self):
+        markdown = "*Screenshot-[01:02]*"
+        matches = extract_screenshot_timestamps(markdown)
+        self.assertEqual(matches, [("*Screenshot-[01:02]*", 62)])
+        self.assertEqual(markdown.replace(matches[0][0], "![](image)", 1), "![](image)")
+
     def test_extract_accepts_legacy_formats(self):
         markdown = "*Screenshot-03:04 and Screenshot-[05:06]"
         matches = extract_screenshot_timestamps(markdown)

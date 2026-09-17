@@ -29,6 +29,7 @@ from app.models.notes_model import AudioDownloadResult, NoteResult
 from app.models.transcriber_model import TranscriptResult, TranscriptSegment
 from app.services.constant import SUPPORT_PLATFORM_MAP
 from app.services.provider import ProviderService
+from app.services.screenshot_policy import apply_screenshot_policy
 from app.transcriber.base import Transcriber
 from app.transcriber.transcriber_provider import get_transcriber, _transcribers
 from app.utils.note_helper import replace_content_markers, prepend_source_link
@@ -223,6 +224,7 @@ class NoteGenerator:
                     formats=_format,
                     audio_meta=audio_meta,
                     platform=platform,
+                    content_profile=content_profile,
                 )
 
             markdown = prepend_source_link(markdown, str(video_url))
@@ -632,6 +634,7 @@ class NoteGenerator:
         formats: List[str],
         audio_meta: AudioDownloadResult,
         platform: str,
+        content_profile: Literal["general", "math_course"] = "general",
     ) -> str:
         """
         对生成的 Markdown 做后期处理：插入截图和/或插入链接。
@@ -643,6 +646,12 @@ class NoteGenerator:
         :param platform: 平台标识，用于链接替换
         :return: 处理后的 Markdown 字符串
         """
+        if "screenshot" in formats:
+            markdown = apply_screenshot_policy(
+                markdown,
+                content_profile=content_profile,
+                video_duration_seconds=audio_meta.duration,
+            )
         if "screenshot" in formats and video_path:
             try:
                 markdown = self._insert_screenshots(markdown, video_path)
