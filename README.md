@@ -168,9 +168,21 @@ BiliNote 是一个开源的 AI 视频笔记助手，支持通过哔哩哔哩、Y
 
 ## 🚀 快速开始
 
-### 方式一：Docker 部署（推荐）
+### 方式一：Docker Compose 一键部署（推荐）
 
-面向最终用户请使用 `docker-compose.release.yml`：它会拉取预构建镜像 `ghcr.io/kiraliang954321/bilinote:latest`，无需本地构建。
+适合普通用户。只需要安装 **Docker Desktop / Docker Engine（带 Docker Compose v2）** 和 Git，无需安装 Python、Node.js、pnpm 或 ffmpeg。
+
+发布编排会直接拉取公开镜像：
+
+```text
+ghcr.io/kiraliang954321/bilinote:latest
+```
+
+镜像同时支持 `linux/amd64` 和 `linux/arm64`。
+
+#### 一键启动
+
+macOS / Linux：
 
 ```bash
 git clone https://github.com/Kiraliang954321/BiliNote.git
@@ -178,32 +190,80 @@ cd BiliNote
 docker compose -f docker-compose.release.yml up -d
 ```
 
-访问：`http://localhost:3015`
+Windows PowerShell：
 
-**更新镜像：**
+```powershell
+git clone https://github.com/Kiraliang954321/BiliNote.git
+Set-Location .\BiliNote
+docker compose -f docker-compose.release.yml up -d
+```
+
+启动完成后访问：
+
+```text
+http://localhost:3015
+```
+
+#### 常用操作
+
+| 操作 | 命令 |
+| --- | --- |
+| 启动 / 后台运行 | `docker compose -f docker-compose.release.yml up -d` |
+| 查看运行状态 | `docker compose -f docker-compose.release.yml ps` |
+| 查看实时日志 | `docker compose -f docker-compose.release.yml logs -f` |
+| 重启服务 | `docker compose -f docker-compose.release.yml restart` |
+| 停止并删除容器 | `docker compose -f docker-compose.release.yml down` |
+| 拉取最新镜像 | `docker compose -f docker-compose.release.yml pull` |
+| 更新并重新启动 | `docker compose -f docker-compose.release.yml pull && docker compose -f docker-compose.release.yml up -d` |
+
+> `down` 不会删除持久化数据。不要随意执行 `docker compose -f docker-compose.release.yml down -v`，因为 `-v` 会同时删除数据卷。
+
+#### 更新到最新版
 
 ```bash
 docker compose -f docker-compose.release.yml pull
 docker compose -f docker-compose.release.yml up -d
 ```
 
-**可选覆盖：** 使用 `BILINOTE_TAG=1.0.0` 固定镜像版本，或使用 `APP_PORT=3016` 改变宿主机端口。
+#### 固定版本部署
+
+当前已发布固定版本 `1.0.0`。如果不希望自动跟随 `latest`，可以固定镜像版本。
+
+macOS / Linux：
 
 ```bash
-# macOS / Linux
 BILINOTE_TAG=1.0.0 docker compose -f docker-compose.release.yml up -d
+```
+
+Windows PowerShell：
+
+```powershell
+$env:BILINOTE_TAG = "1.0.0"
+docker compose -f docker-compose.release.yml up -d
+```
+
+#### 修改访问端口
+
+默认端口是 `3015`。例如改成 `3016`：
+
+macOS / Linux：
+
+```bash
 APP_PORT=3016 docker compose -f docker-compose.release.yml up -d
 ```
 
+Windows PowerShell：
+
 ```powershell
-# PowerShell
-$env:BILINOTE_TAG = "1.0.0"
-docker compose -f docker-compose.release.yml up -d
 $env:APP_PORT = "3016"
 docker compose -f docker-compose.release.yml up -d
 ```
 
-发布编排会持久化四个命名卷：`data`（SQLite 数据库和生成的笔记）、`config`（LLM 供应商配置 / Cookie / 转写设置）、`static`（笔记引用的视频截图）和 `models`（Whisper 模型缓存）。`docker compose -f docker-compose.release.yml down` 会停止并删除容器但保留这些命名卷；添加 `-v`（即 `docker compose -f docker-compose.release.yml down -v`）会删除命名卷和其中的数据。
+然后访问 `http://localhost:3016`。
+
+#### 数据持久化
+
+发布编排使用四个 Docker 命名卷保存数据：`data`（SQLite 数据库和生成笔记）、`config`（LLM 供应商配置 / Cookie / 转写设置）、`static`（笔记引用的视频截图）和 `models`（Whisper 模型缓存）。正常更新、重启以及执行 `docker compose -f docker-compose.release.yml down` 都不会删除这些数据。
 
 **开发者 / 源码构建（高级用法）：** `docker-compose.yml` 用于本地源码构建，不是最终用户的发布部署编排。
 
@@ -358,39 +418,6 @@ docker-compose -f docker-compose.gpu.yml up --build -d   # 用 GPU 栈重建
 **起来了但没走 GPU？** 依次排查：① 宿主机 `nvidia-smi` 是否正常 → ② NVIDIA Container Toolkit 是否装好（上面 `--gpus all` 测试是否通过）→ ③ `docker logs bilinote-backend` 是否有 CUDA / cuDNN 报错（驱动 CUDA 版本需 ≥ 12.4）。
 
 `fast-whisper` 本身的 GPU 依赖说明可参考：[faster-whisper 项目](https://github.com/SYSTRAN/faster-whisper#requirements)
-
-### 🐳 使用 Docker 一键部署
-
-最终用户请使用发布编排 `docker-compose.release.yml`，它拉取预构建镜像 `ghcr.io/kiraliang954321/bilinote:latest`；不要将用于本地源码构建的 `docker-compose.yml` 当作发布部署使用。
-
-```bash
-git clone https://github.com/Kiraliang954321/BiliNote.git
-cd BiliNote
-docker compose -f docker-compose.release.yml up -d
-```
-
-访问：`http://localhost:3015`。更新时运行：
-
-```bash
-docker compose -f docker-compose.release.yml pull
-docker compose -f docker-compose.release.yml up -d
-```
-
-可用 `BILINOTE_TAG=1.0.0` 固定版本，或用 `APP_PORT=3016` 覆盖端口：
-
-```bash
-BILINOTE_TAG=1.0.0 docker compose -f docker-compose.release.yml up -d
-APP_PORT=3016 docker compose -f docker-compose.release.yml up -d
-```
-
-```powershell
-$env:BILINOTE_TAG = "1.0.0"
-docker compose -f docker-compose.release.yml up -d
-$env:APP_PORT = "3016"
-docker compose -f docker-compose.release.yml up -d
-```
-
-发布编排的命名卷持久化 `data`、`config`、`static` 和 `models` 四个区域。`docker compose -f docker-compose.release.yml down` 保留命名卷；`docker compose -f docker-compose.release.yml down -v` 会删除命名卷及其数据。开发者需要本地源码构建或 GPU 支持时，请使用上方的 `docker-compose.yml` / `docker-compose.gpu.yml` 高级用法。
 
 ## 🧠 TODO
 
