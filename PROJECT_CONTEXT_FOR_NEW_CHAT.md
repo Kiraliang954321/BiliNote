@@ -2,7 +2,7 @@
 
 > 用途：把本文件内容直接复制到新的 ChatGPT 对话中，即可继续当前项目。
 > 整理时间：2026-09-17
-> 数学课程模式当前实现 checkpoint：`9fe5271`
+> 当前源码 HEAD：`272448e`；数学课程模式当前实现 checkpoint：`9fe5271`
 > 新聊天开始后必须重新核对真实 Git / Docker 状态，不要只依赖本文件中的时间点信息。
 
 ## 可直接复制到新聊天
@@ -14,7 +14,8 @@
 部署根目录：G:\Project\bilinote
 源码 Git 仓库：G:\Project\bilinote\source
 Git 分支：master
-数学课程模式当前实现 checkpoint：9fe5271
+当前源码 HEAD：272448e
+数学课程模式实现 checkpoint：9fe5271
 
 新聊天开始后，请先真实执行：
 - git status --short
@@ -120,6 +121,11 @@ Git 分支：master
    - 本地完整 Docker build RCA：必须在 `.dockerignore` 显式排除 `BillNote_frontend/node_modules/`，避免 Windows Junction 覆盖 Linux pnpm 安装结果。
    - checkpoint：9fe5271 fix(math-course): preserve latex in real acceptance
 
+12. 已完成公共 Docker/GHCR 发布验证。
+   - GitHub 仓库：Kiraliang954321/BiliNote；当前源码 HEAD：272448e（数学课程实现 checkpoint 仍为 9fe5271）。
+   - 公共镜像：ghcr.io/kiraliang954321/bilinote；匿名拉取 `latest` 和 `1.0.0` 均已验证，两个标签均提供 linux/amd64 和 linux/arm64。
+   - `latest` 发布 run 35208721814 SUCCESS；`1.0.0` 发布 run 35211237300 SUCCESS；版本镜像仓库 digest：sha256:8560d86d42cbba6618756e3e1943aaf41b8f015782d47dcb17c06a71ed271abb。
+
 【当前架构】
 部署目录本身不是 Git 仓库：
 G:\Project\bilinote
@@ -127,13 +133,20 @@ G:\Project\bilinote
 真正的 Git 仓库：
 G:\Project\bilinote\source
 
-当前生产部署结构：
+当前本地生产部署结构（未被公共 GHCR 发布替换）：
 bilinote-local:math-course-9fe5271
 ├─ local backend（含 WI-MATH-01 ~ WI-MATH-06）
 ├─ local frontend production build
 ├─ nginx
 ├─ ffmpeg
 └─ bind mounts: data / config / static / models
+
+本地生产容器仍通过 HTTP 3015 提供服务，使用上述 `bilinote-local:math-course-9fe5271` 镜像；未切换为公共 GHCR 镜像。
+
+公共发布架构：
+- 工作流使用原生 `ubuntu-24.04` 和 `ubuntu-24.04-arm` runners 构建，再 merge-manifest 发布多架构镜像。
+- 旧 QEMU run 35201555994 在停滞超过 62 分钟后已取消。
+- 发布 Compose 文件：`docker-compose.release.yml`；用户启动命令：`docker compose -f docker-compose.release.yml up -d`。
 
 当前源码中的 math_course 最终截图链路：
 video_interval 固定抽帧
@@ -250,6 +263,7 @@ AI 指定的大致时间 ≠ 最终实际截帧时间。
 WI-MATH-01 ~ WI-MATH-06 已完成，不要重新设计或重复实现。
 
 后续优先级：
+- GitHub Actions 中若干 action 仍以已弃用的 Node.js 20 为目标，但已被强制使用 Node.js 24；这是非阻塞的未来 CI 维护事项，不是当前发布阻塞项。
 - 用更多真实数学课程持续观察阈值泛化，尤其是几何图、函数图、长板书和频繁翻页课程。
 - 如再出现稳定帧或感知去重误判，先记录样本与时间点，再做有证据的阈值校准；不要直接扩大到 OCR/YOLO。
 - 可独立处理既有测试债务（ConcurrentTaskExecutor 旧测试、pytest dev dependency、全量 discovery module stub 污染），但不要和 math-course 行为改动混为一批。
