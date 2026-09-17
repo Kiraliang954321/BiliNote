@@ -1,6 +1,6 @@
 # BiliNote 数学课程模式改造设计
 
-> 状态：WI-MATH-05 已完成 / WI-MATH-06 待真实验收
+> 状态：WI-MATH-06 真实验收已完成
 > 基线：`master@9ae7243`
 > 目标：为数学课程总结提供“公式优先、截图稀疏、完整板书优先”的专用模式，同时保持现有通用模式兼容。
 
@@ -1090,6 +1090,8 @@ WI-MATH-04 Perceptual Sampling Dedupe
   checkpoint: 81bc67d
 WI-MATH-05 Math Prompt + UI Preset
   checkpoint: c4a56c5
+WI-MATH-06 Real Math Course Acceptance + LaTeX acceptance fix
+  checkpoint: 9fe5271
 ```
 
 WI-MATH-05 已完成并通过 Codex Review：
@@ -1101,11 +1103,18 @@ WI-MATH-05 已完成并通过 Codex Review：
 - Web UI 仅显示 `math_course + academic` 推荐，不自动修改 style。
 - 最终验证：41 个相关 backend tests PASS，`py_compile` PASS，frontend production build PASS，`git diff --check` PASS。
 
-当前下一项已经确定，不重新做前五个 WorkItem：
+WI-MATH-06 已完成真实运行验收：
 
-```text
-WI-MATH-06 Real Math Course Acceptance
-```
+- 运行 Docker 已切换为本地完整镜像 `bilinote-local:math-course-9fe5271`，而不是官方旧 backend。
+- 正式 baseline：`BV1Up4y1Y76a_p16`，449.723s，旧 task `4cda8657-6a1e-456a-86a5-6027e6a0d04a`，72 张截图。
+- 第一次 E2E 将截图降到 4 张，但暴露 Prompt LaTeX 回归：0 个 `$` delimiter、公式被放入 Markdown 反引号，因此验收未放行。
+- bounded TDD fix 后，math_course 明确要求行内 `$...$`、展示/推导 `$$...$$`，并禁止 LaTeX 代码跨度。
+- 第二次 E2E task `eccde9b7-27d0-4028-82d9-414cdb575b90`：3 张截图、88 个 `$` delimiter token、0 个反引号字符。
+- 3 张图无连续重复；核心定理、例题关键推导和 2012 真题保留；最后一图底部仍有局部书写中内容，但半写板书已从旧版“大量出现”降到单个局部情况。
+- 该样本没有几何图/函数图，因此这两类保留目标在本样本不适用。
+- math-course 相关 42 tests PASS；general/profile 隔离 19 tests PASS；`py_compile`、`git diff --check` PASS。
+- Docker HTTP 200，`data/config/static/models` 四个 bind mount 保持。
+- 完整 Docker build 另修复 `.dockerignore`：显式排除 `BillNote_frontend/node_modules/`，避免 Windows Junction 覆盖 Linux pnpm 依赖。
 
 Integration 注意：
 
@@ -1113,22 +1122,23 @@ Integration 注意：
 - 它们都会接入 `backend/app/services/note.py`，共享文件 Integration 必须串行。
 - Pi 调度服从单 active mutation gate，不能并发修改同一工作区。
 
-最终真实验收目标：
+最终真实验收结果：
 
 ```text
-当前失败基线：约 7 分钟课程 / 72 Screenshot intents
-目标：最终截图 <= 6
+449.723s p16 baseline：72 screenshots
+最终：3 screenshots
+LaTeX：88 dollar delimiter tokens / 0 backticks
 ```
 
 并同时满足：
 
-- 没有连续重复截图
-- 明显减少“公式只写了一半”的截图
-- 关键题目、几何图、完整板书仍保留
-- LaTeX 笔记完整度不下降
-- general 模式无回归
-- Docker HTTP 200
-- data/config/static/models 持久化不受影响
+- 没有连续重复截图：PASS
+- 明显减少“公式只写了一半”的截图：PASS（仍有 1 张局部书写中内容）
+- 关键题目/完整板书保留：PASS；几何图/函数图：样本不适用
+- LaTeX 笔记完整度不下降：PASS
+- general 模式无新增回归：PASS
+- Docker HTTP 200：PASS
+- data/config/static/models 持久化不受影响：PASS
 
 ---
 
@@ -1146,7 +1156,7 @@ G:\Project\bilinote
 G:\Project\bilinote\source
 
 当前分支：master
-当前实现 checkpoint：c4a56c5
+当前实现 checkpoint：9fe5271
 
 请先读取：
 G:\Project\bilinote\source\MATH_COURSE_MODE_DESIGN.md
@@ -1154,11 +1164,11 @@ G:\Project\bilinote\source\MATH_COURSE_MODE_DESIGN.md
 G:\Project\bilinote\启动说明书.md
 
 当前 Docker 部署：
-- 使用 ghcr.io/jefferyhcool/bilinote:latest
+- 使用本地完整镜像 bilinote-local:math-course-9fe5271
 - 访问 http://localhost:3015
 - data/config/static/models 均持久化在 G:\Project\bilinote
-- frontend-dist 以只读 volume 覆盖官方前端
-- 当前后端仍是官方镜像内 backend
+- backend/frontend/nginx/ffmpeg 均来自当前源码构建
+- 运行容器已真实包含 WI-MATH-01 ~ WI-MATH-06
 
 已经完成：
 1. BiliNote Docker 部署。
@@ -1170,6 +1180,7 @@ G:\Project\bilinote\启动说明书.md
 7. WI-MATH-03 Stable Frame Selector，checkpoint：60f22c3。
 8. WI-MATH-04 Perceptual Sampling Dedupe，checkpoint：81bc67d。
 9. WI-MATH-05 Math Prompt + UI Preset，checkpoint：c4a56c5。
+10. WI-MATH-06 Real Math Course Acceptance，checkpoint：9fe5271。
 
 原始数学截图问题：
 - 默认每 6 秒固定抽帧。
@@ -1195,8 +1206,7 @@ G:\Project\bilinote\启动说明书.md
 请继续遵循现有 Phase 20 / Codex-Pi 工作流：
 先调查真实磁盘/Git/容器状态；Codex 负责 Investigation/RCA/Architecture/Task Contract/Review/Integration；非平凡代码实现交给 pi_worker，禁止 blind retry。
 
-下一步已经确定：直接进入 WI-MATH-06 — Real Math Course Acceptance，不要重新设计或实现 WI-MATH-01 ~ WI-MATH-05。
-WI-MATH-06 首先必须让运行中的 Docker backend 真正包含 WI-MATH-01 ~ WI-MATH-05，然后记录真实数学课程 baseline 并进行前后对照验收。
-
-最终验收目标：约 7 分钟数学课程最终截图 <= 6，避免连续重复和未写完板书，同时关键视觉内容保留，general 模式不回归。
+WI-MATH-01 ~ WI-MATH-06 已完成，不要重新设计或重复实现。
+后续优先使用更多真实数学课程观察阈值泛化；发现问题时先记录具体视频和时间点，再进行有证据的阈值校准。不要未经证据扩大到 OCR/YOLO。
+另有独立既有测试债务：ConcurrentTaskExecutor 与旧 serial test 语义不一致、production requirements 缺 pytest、全量 unittest discovery 有 module stub 污染；这些不要与 math-course 改动混为一批。
 ```

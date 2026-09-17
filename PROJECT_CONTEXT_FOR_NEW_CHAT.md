@@ -2,7 +2,7 @@
 
 > 用途：把本文件内容直接复制到新的 ChatGPT 对话中，即可继续当前项目。
 > 整理时间：2026-09-17
-> 数学课程模式当前实现 checkpoint：`c4a56c5`
+> 数学课程模式当前实现 checkpoint：`9fe5271`
 > 新聊天开始后必须重新核对真实 Git / Docker 状态，不要只依赖本文件中的时间点信息。
 
 ## 可直接复制到新聊天
@@ -14,7 +14,7 @@
 部署根目录：G:\Project\bilinote
 源码 Git 仓库：G:\Project\bilinote\source
 Git 分支：master
-数学课程模式当前实现 checkpoint：c4a56c5
+数学课程模式当前实现 checkpoint：9fe5271
 
 新聊天开始后，请先真实执行：
 - git status --short
@@ -26,8 +26,8 @@ Git 分支：master
 - G:\Project\bilinote\启动说明书.md
 
 【已完成内容】
-1. 已通过 Docker 部署 BiliNote。
-   - 镜像：ghcr.io/jefferyhcool/bilinote:latest
+1. 已通过 Docker 部署 BiliNote，并已切换到本地完整 math-course runtime。
+   - 当前镜像：bilinote-local:math-course-9fe5271
    - 容器：bilinote
    - 访问：http://localhost:3015
    - restart: unless-stopped
@@ -44,13 +44,12 @@ Git 分支：master
    - 不修改原始 Markdown，只在渲染阶段转换。
    源码 checkpoint：9ae7243 fix(frontend): render LaTeX math in notes and chat
 
-3. 当前部署使用“官方后端 + 本地前端覆盖层”。
-   - 官方镜像仍提供 backend/nginx。
-   - G:\Project\bilinote\frontend-dist 通过只读 volume 覆盖 /usr/share/nginx/html。
-   - docker-compose.yml 中有：
-     ./frontend-dist:/usr/share/nginx/html:ro
-   - 数学公式修复已经实际部署。
-   - HTTP 200、容器运行和持久化目录都已验证。
+3. 当前部署已改为“本地完整镜像”。
+   - backend、frontend、nginx、ffmpeg 均来自 G:\Project\bilinote\source 构建结果。
+   - 当前 Compose 镜像：bilinote-local:math-course-9fe5271。
+   - 不再依赖 frontend-dist 只读覆盖层提供当前生产前端。
+   - data/config/static/models 四个目录继续 bind mount 持久化。
+   - HTTP 200、容器代码版本、ffmpeg 和四个持久化挂载均已真实验证。
 
 4. 已完成数学课程截图问题的真实调查和 RCA。
    已确认：
@@ -110,6 +109,17 @@ Git 分支：master
    - 最终相关 backend 回归：41 tests PASS；`py_compile` PASS；frontend production build PASS；`git diff --check` PASS。
    - checkpoint：c4a56c5 feat(math-course): add math prompt and ui preset
 
+11. 已完成 WI-MATH-06 — Real Math Course Acceptance。
+   - 正式失败 baseline：BV1Up4y1Y76a_p16，旧 task `4cda8657-6a1e-456a-86a5-6027e6a0d04a`，时长 449.723s，旧结果 72 张截图。
+   - 首次真实 E2E task `e9ee8321-3375-44a3-be9a-360e050538c9` 将截图降到 4 张，但发现公式被模型放入 Markdown 反引号，LaTeX delimiter 回归，因此未直接验收通过。
+   - bounded TDD fix 明确要求 math_course 行内公式使用 `$...$`、展示/推导使用 `$$...$$`，禁止把 LaTeX 放入反引号代码跨度。
+   - 第二次真实 E2E task `eccde9b7-27d0-4028-82d9-414cdb575b90` SUCCESS：最终 3 张截图、88 个 `$` delimiter token、0 个反引号字符。
+   - 3 张截图无连续重复；核心“0×有界=0”板书、两个例题关键结论和 2012 真题均保留；最后一张底部仍有局部正在书写内容，但相较旧版大量半写板书已明显减少。
+   - 该课程没有几何图/函数图，因此这些保留项在本样本不适用。
+   - math-course 跨阶段回归 42 tests PASS；general/profile 隔离回归 19 tests PASS；`py_compile` / `git diff --check` PASS。
+   - 本地完整 Docker build RCA：必须在 `.dockerignore` 显式排除 `BillNote_frontend/node_modules/`，避免 Windows Junction 覆盖 Linux pnpm 安装结果。
+   - checkpoint：9fe5271 fix(math-course): preserve latex in real acceptance
+
 【当前架构】
 部署目录本身不是 Git 仓库：
 G:\Project\bilinote
@@ -118,12 +128,12 @@ G:\Project\bilinote
 G:\Project\bilinote\source
 
 当前生产部署结构：
-Docker official image
-├─ official backend
-├─ official nginx
-└─ /usr/share/nginx/html
-     ↑
-     └─ G:\Project\bilinote\frontend-dist (read-only bind mount)
+bilinote-local:math-course-9fe5271
+├─ local backend（含 WI-MATH-01 ~ WI-MATH-06）
+├─ local frontend production build
+├─ nginx
+├─ ffmpeg
+└─ bind mounts: data / config / static / models
 
 当前源码中的 math_course 最终截图链路：
 video_interval 固定抽帧
@@ -137,7 +147,7 @@ video_interval 固定抽帧
 → generate_screenshot() 使用选定 timestamp
 → Markdown 插图
 
-注意：上述后端源码链路尚未部署到当前官方 backend 容器；当前生产容器仍运行官方 backend。
+上述后端源码链路已经实际部署到当前运行容器，并通过容器内源码特征与真实 E2E 验证。
 
 核心原则：
 AI 看多少帧 ≠ 最终笔记放多少图。
@@ -215,46 +225,35 @@ AI 指定的大致时间 ≠ 最终实际截帧时间。
     - 旧笔记批量重写
 
 【尚未解决的问题】
-1. 后端自定义代码的生产部署方式还未最终冻结。
-   当前 Docker 仍使用官方 backend，只覆盖前端。
-   `WI-MATH-01/02/03/04/05` 已在源码仓库实现，但当前生产容器尚未运行这些 backend 改动。
-   后续 Integration 必须明确：
-   - 构建本地完整 Docker 镜像；或
-   - 开发阶段 bind mount backend，稳定后再固化镜像。
-   必须避免“source/backend 已改，但生产容器仍跑官方 backend”的假完成。
-
-2. 感知相似度与稳定帧阈值尚未使用真实数学样本校准。
+1. 感知相似度与稳定帧阈值只完成了一个真实数学样本的验收，仍应继续用更多课程类型做长期校准。
    StableFrameSelector 当前工程阈值：
    - scene-cut threshold = 0.18
    - settled motion threshold = 0.03
    Perceptual Sampling Dedupe 当前工程阈值：
    - dHash Hamming distance <= 2
    - normalized grayscale mean pixel delta <= 0.006
-   这些阈值后续都需要用真实数学课程样本回归校准。
+   当前 p16 样本已证明整体链路有效，但这些阈值不是永久标准。
 
-3. Windows 主机当前 PATH 中没有 ffmpeg。
+2. Windows 主机当前 PATH 中没有 ffmpeg。
    - Pillow/numpy 可用。
    - backend/Dockerfile 与 Dockerfile.complete 已安装 ffmpeg。
    - 因此 synthetic tests 可执行，但真实视频现场验证应在带 ffmpeg 的运行环境完成。
 
-4. 真实 E2E 验收样本应正式记录 task/video baseline，包含：
-   - 原 marker 数
-   - 最终截图数
-   - 哪些属于未写完板书
-   - 哪些关键图必须保留
+3. 全量 `unittest discover` 存在既有测试债务，与本次 math-course 改动无 diff：
+   - production requirements 不包含 pytest，因此 `test_url_normalize.py` 在 production container discovery 中无法导入。
+   - `test_task_serial_executor.py` 仍断言峰值并发为 1，但当前原始实现早已是 `ConcurrentTaskExecutor`，默认 `TASK_MAX_WORKERS=3`。
+   - `test_ydl_retry_opts` 在全量同进程 discovery 中会受前序 module stub 污染，但隔离执行 4 tests PASS。
 
-5. Browser extension 是否同步支持 content_profile 可后续决定；backend 已兼容旧插件不传字段时默认 general。
+4. Browser extension 是否同步支持 content_profile 可后续决定；backend 已兼容旧插件不传字段时默认 general。
 
 【下一步计划】
-不要重新做 WI-MATH-01 ~ WI-MATH-05 的设计或实现，直接进入：
-WI-MATH-06 — Real Math Course Acceptance
+WI-MATH-01 ~ WI-MATH-06 已完成，不要重新设计或重复实现。
 
-WI-MATH-06 目标：
-- 先确定并部署真正包含 WI-MATH-01 ~ WI-MATH-05 的 backend runtime，不能继续使用官方旧 backend 做验收。
-- 正式记录真实数学课程 baseline：video/task ID、原始 Screenshot marker 数、最终截图数、未写完板书、必须保留的关键图。
-- 用约 7 分钟真实数学课程重新生成，目标最终截图 <= 6。
-- 人工核对：无连续重复图、明显减少未写完板书、关键题目/几何图/函数图/完整板书仍保留、LaTeX 完整度不下降。
-- 验证 general 模式无回归、Docker HTTP 200、data/config/static/models 持久化不受影响。
+后续优先级：
+- 用更多真实数学课程持续观察阈值泛化，尤其是几何图、函数图、长板书和频繁翻页课程。
+- 如再出现稳定帧或感知去重误判，先记录样本与时间点，再做有证据的阈值校准；不要直接扩大到 OCR/YOLO。
+- 可独立处理既有测试债务（ConcurrentTaskExecutor 旧测试、pytest dev dependency、全量 discovery module stub 污染），但不要和 math-course 行为改动混为一批。
+- Browser Extension 是否增加 `content_profile` UI 仍是可选后续项。
 
 Integration 约束：
 - WI-MATH-02/03/04 的核心逻辑可分别实现。
@@ -267,17 +266,12 @@ Codex 负责 Investigation / RCA / Architecture / Task Contract / Review / Integ
 Pi 只负责 bounded implementation 和 focused self-test。
 Codex Review 后如有 bounded findings，最多一次批量 pi_fix；不要一条问题一次 fix。
 
-【最终验收目标】
-当前失败基线：约 7 分钟课程 / 约 72 Screenshot intents。
-目标：最终截图 <= 6。
-同时要求：
-- 无连续重复截图。
-- 明显减少公式/板书只写一半的截图。
-- 关键题目、几何图、完整板书仍保留。
-- LaTeX 内容完整度不下降。
-- general 模式不回归。
-- Docker HTTP 200。
-- data/config/static/models 持久化不受影响。
+【WI-MATH-06 最终验收结果】
+- 449.723s p16 真实样本：72 张 -> 3 张。
+- 无连续重复截图；半写板书明显减少；关键题目/板书保留。
+- LaTeX：88 个 `$` delimiter token，0 个反引号公式；第一次 E2E 暴露的 LaTeX 回归已修复。
+- general/profile 回归通过；Docker HTTP 200；data/config/static/models 持久化保持。
+- 当前运行镜像：bilinote-local:math-course-9fe5271。
 
-请从 WI-MATH-06 — Real Math Course Acceptance 开始工作。
+请从“更多真实样本观察 / 阈值校准或独立测试债务处理”继续，不要重做 WI-MATH-01 ~ WI-MATH-06。
 ```
