@@ -170,34 +170,49 @@ BiliNote 是一个开源的 AI 视频笔记助手，支持通过哔哩哔哩、Y
 
 ### 方式一：Docker 部署（推荐）
 
-确保已安装 Docker，直接拉取预构建镜像运行：
+面向最终用户请使用 `docker-compose.release.yml`：它会拉取预构建镜像 `ghcr.io/kiraliang954321/bilinote:latest`，无需本地构建。
 
 ```bash
-docker pull ghcr.io/jefferyhcool/bilinote:latest
-
-docker run -d -p 80:80 \
-  -v bilinote-data:/app/backend/data \
-  -v bilinote-config:/app/backend/config \
-  -v bilinote-static:/app/backend/static \
-  -v bilinote-models:/app/backend/models \
-  --name bilinote \
-  ghcr.io/jefferyhcool/bilinote:latest
+git clone https://github.com/Kiraliang954321/BiliNote.git
+cd BiliNote
+docker compose -f docker-compose.release.yml up -d
 ```
 
-上面四个卷分别持久化：`data`（SQLite 数据库 + 生成的笔记）、`config`（LLM 供应商配置 / Cookie / 转写设置）、`static`（笔记引用的视频截图）、`models`（Whisper 模型缓存，可选，避免每次重新下载）。这样 `docker pull` 升级新镜像、删旧容器重建后，配置和历史都不会丢。
+访问：`http://localhost:3015`
 
-> ⚠️ **不要**用 `-v 卷名:/app/backend` 挂整个后端目录——命名卷会用首次启动时的镜像内容固化，之后 `docker pull` 升级也会被旧代码盖住，导致「升级不生效」。只挂上面这些数据子目录即可。
-
-访问：`http://localhost`
-
-也可以使用 docker-compose 本地构建：
+**更新镜像：**
 
 ```bash
-cp .env.example .env       # 第一次部署务必先创建 .env，否则 BACKEND_PORT/APP_PORT 等变量为空会启动失败
-docker-compose up --build -d
+docker compose -f docker-compose.release.yml pull
+docker compose -f docker-compose.release.yml up -d
+```
+
+**可选覆盖：** 使用 `BILINOTE_TAG=1.0.0` 固定镜像版本，或使用 `APP_PORT=3016` 改变宿主机端口。
+
+```bash
+# macOS / Linux
+BILINOTE_TAG=1.0.0 docker compose -f docker-compose.release.yml up -d
+APP_PORT=3016 docker compose -f docker-compose.release.yml up -d
+```
+
+```powershell
+# PowerShell
+$env:BILINOTE_TAG = "1.0.0"
+docker compose -f docker-compose.release.yml up -d
+$env:APP_PORT = "3016"
+docker compose -f docker-compose.release.yml up -d
+```
+
+发布编排会持久化四个命名卷：`data`（SQLite 数据库和生成的笔记）、`config`（LLM 供应商配置 / Cookie / 转写设置）、`static`（笔记引用的视频截图）和 `models`（Whisper 模型缓存）。`docker compose -f docker-compose.release.yml down` 会停止并删除容器但保留这些命名卷；添加 `-v`（即 `docker compose -f docker-compose.release.yml down -v`）会删除命名卷和其中的数据。
+
+**开发者 / 源码构建（高级用法）：** `docker-compose.yml` 用于本地源码构建，不是最终用户的发布部署编排。
+
+```bash
+cp .env.example .env       # 第一次本地源码构建务必先创建 .env
+docker compose -f docker-compose.yml up --build -d
 
 # GPU 加速部署（需要 NVIDIA GPU + NVIDIA Container Toolkit）
-docker-compose -f docker-compose.gpu.yml up --build -d
+docker compose -f docker-compose.gpu.yml up --build -d
 ```
 
 #### Docker 部署常见问题（FAQ）
@@ -208,7 +223,7 @@ docker-compose -f docker-compose.gpu.yml up --build -d
 
 `docker-compose build` 拉 `python:3.11-slim` / `node:20-alpine` / `nginx:1.25-alpine` 时连 `auth.docker.io` 超时。三种解法，按推荐顺序：
 
-- **方法 A：直接用预构建镜像（最省事）**——不要本地 build，跳到上面的 `docker pull ghcr.io/jefferyhcool/bilinote:latest` 路径，ghcr.io 在国内通常比 docker.io 顺。
+- **方法 A：直接用预构建镜像（最省事）**——不要本地 build，使用上面的 `docker compose -f docker-compose.release.yml up -d` 发布部署路径（镜像为 `ghcr.io/kiraliang954321/bilinote:latest`），ghcr.io 在国内通常比 docker.io 顺。
 - **方法 B：配置 Docker daemon 镜像加速器**——编辑 `~/.docker/daemon.json`（Linux 在 `/etc/docker/daemon.json`），加：
   ```json
   {
@@ -346,37 +361,36 @@ docker-compose -f docker-compose.gpu.yml up --build -d   # 用 GPU 栈重建
 
 ### 🐳 使用 Docker 一键部署
 
-确保你已安装 Docker，然后直接拉取预构建镜像运行：
+最终用户请使用发布编排 `docker-compose.release.yml`，它拉取预构建镜像 `ghcr.io/kiraliang954321/bilinote:latest`；不要将用于本地源码构建的 `docker-compose.yml` 当作发布部署使用。
 
 ```bash
-# 拉取最新镜像
-docker pull ghcr.io/jefferyhcool/bilinote:latest
-
-# 运行容器
-docker run -d -p 80:80 \
-  -v bilinote-data:/app/backend/data \
-  -v bilinote-config:/app/backend/config \
-  -v bilinote-static:/app/backend/static \
-  -v bilinote-models:/app/backend/models \
-  --name bilinote \
-  ghcr.io/jefferyhcool/bilinote:latest
+git clone https://github.com/Kiraliang954321/BiliNote.git
+cd BiliNote
+docker compose -f docker-compose.release.yml up -d
 ```
 
-上面四个卷分别持久化：`data`（SQLite 数据库 + 生成的笔记）、`config`（LLM 供应商配置 / Cookie / 转写设置）、`static`（笔记引用的视频截图）、`models`（Whisper 模型缓存，可选，避免每次重新下载）。这样 `docker pull` 升级新镜像、删旧容器重建后，配置和历史都不会丢。
-
-> ⚠️ **不要**用 `-v 卷名:/app/backend` 挂整个后端目录——命名卷会用首次启动时的镜像内容固化，之后 `docker pull` 升级也会被旧代码盖住，导致「升级不生效」。只挂上面这些数据子目录即可。
-
-访问：`http://localhost`
-
-也可以使用 docker-compose 本地构建：
+访问：`http://localhost:3015`。更新时运行：
 
 ```bash
-# 标准部署
-docker-compose up -d
-
-# GPU 加速部署（需要 NVIDIA GPU + NVIDIA Container Toolkit，详见上方「CUDA / GPU 加速」）
-docker-compose -f docker-compose.gpu.yml up --build -d
+docker compose -f docker-compose.release.yml pull
+docker compose -f docker-compose.release.yml up -d
 ```
+
+可用 `BILINOTE_TAG=1.0.0` 固定版本，或用 `APP_PORT=3016` 覆盖端口：
+
+```bash
+BILINOTE_TAG=1.0.0 docker compose -f docker-compose.release.yml up -d
+APP_PORT=3016 docker compose -f docker-compose.release.yml up -d
+```
+
+```powershell
+$env:BILINOTE_TAG = "1.0.0"
+docker compose -f docker-compose.release.yml up -d
+$env:APP_PORT = "3016"
+docker compose -f docker-compose.release.yml up -d
+```
+
+发布编排的命名卷持久化 `data`、`config`、`static` 和 `models` 四个区域。`docker compose -f docker-compose.release.yml down` 保留命名卷；`docker compose -f docker-compose.release.yml down -v` 会删除命名卷及其数据。开发者需要本地源码构建或 GPU 支持时，请使用上方的 `docker-compose.yml` / `docker-compose.gpu.yml` 高级用法。
 
 ## 🧠 TODO
 
