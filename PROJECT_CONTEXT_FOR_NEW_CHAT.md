@@ -2,7 +2,7 @@
 
 > 用途：把本文件内容直接复制到新的 ChatGPT 对话中，即可继续当前项目。
 > 整理时间：2026-09-17
-> 数学课程模式当前实现 checkpoint：`81bc67d`
+> 数学课程模式当前实现 checkpoint：`c4a56c5`
 > 新聊天开始后必须重新核对真实 Git / Docker 状态，不要只依赖本文件中的时间点信息。
 
 ## 可直接复制到新聊天
@@ -14,7 +14,7 @@
 部署根目录：G:\Project\bilinote
 源码 Git 仓库：G:\Project\bilinote\source
 Git 分支：master
-数学课程模式当前实现 checkpoint：81bc67d
+数学课程模式当前实现 checkpoint：c4a56c5
 
 新聊天开始后，请先真实执行：
 - git status --short
@@ -99,6 +99,16 @@ Git 分支：master
    - 感知分析失败 fail-open：保留两帧并继续处理，不让可选去重优化阻断视频流程。
    - 27 个 focused/compatibility tests PASS。
    - checkpoint：81bc67d feat(math-course): add perceptual sampling dedupe
+
+10. 已完成 WI-MATH-05 — Math Prompt + UI Preset。
+   - `content_profile=math_course` 已真正进入 Prompt 构建链路；UniversalGPT 在正常 chunk、fallback chunk 与最终 chunk message 构建时均透传 profile。
+   - math_course 普通公式、定义和推导优先使用 LaTeX/Markdown。
+   - 仅在启用 `screenshot` format 时追加数学截图约束：优先完整题目、几何图、函数/坐标图、关键完整板书和必要完整页推导；避免连续 marker、逐时间点枚举和未完成书写状态；通常至少间隔 45 秒。
+   - math_course 未启用截图时只保留 LaTeX-first 规则，不会注入 Screenshot marker 指令。
+   - Web UI 选择 math_course 时显示“推荐配合学术风格”，但不会自动修改 `style`，保持两者独立。
+   - Codex Review 发现并修复一次 bounded finding；fix 采用 TDD，先观察 RED 再 GREEN。
+   - 最终相关 backend 回归：41 tests PASS；`py_compile` PASS；frontend production build PASS；`git diff --check` PASS。
+   - checkpoint：c4a56c5 feat(math-course): add math prompt and ui preset
 
 【当前架构】
 部署目录本身不是 Git 仓库：
@@ -207,7 +217,7 @@ AI 指定的大致时间 ≠ 最终实际截帧时间。
 【尚未解决的问题】
 1. 后端自定义代码的生产部署方式还未最终冻结。
    当前 Docker 仍使用官方 backend，只覆盖前端。
-   `WI-MATH-01/02/03/04` 已在源码仓库实现，但当前生产容器尚未运行这些 backend 改动。
+   `WI-MATH-01/02/03/04/05` 已在源码仓库实现，但当前生产容器尚未运行这些 backend 改动。
    后续 Integration 必须明确：
    - 构建本地完整 Docker 镜像；或
    - 开发阶段 bind mount backend，稳定后再固化镜像。
@@ -236,21 +246,15 @@ AI 指定的大致时间 ≠ 最终实际截帧时间。
 5. Browser extension 是否同步支持 content_profile 可后续决定；backend 已兼容旧插件不传字段时默认 general。
 
 【下一步计划】
-不要重新做架构设计，直接从：
-WI-MATH-05 — Math Prompt + UI Preset
-开始。
-
-WI-MATH-05 目标：
-- 只处理 math_course Prompt 与 Web UI preset。
-- 普通公式、定义、推导优先 LaTeX，不用截图替代。
-- 截图优先完整题目原图、几何图、函数图/坐标图、关键完整板书。
-- 禁止枚举每个可见时间点或连续输出 Screenshot marker。
-- 同一知识点只选一个代表 intent，优先老师完成书写后的时刻。
-- content_profile 与 style 保持独立，不自动把 style 改成 academic。
-- 不改变 WI-MATH-02 ScreenshotPolicy、WI-MATH-03 StableFrameSelector、WI-MATH-04 感知采样去重语义。
-
-后续顺序：
+不要重新做 WI-MATH-01 ~ WI-MATH-05 的设计或实现，直接进入：
 WI-MATH-06 — Real Math Course Acceptance
+
+WI-MATH-06 目标：
+- 先确定并部署真正包含 WI-MATH-01 ~ WI-MATH-05 的 backend runtime，不能继续使用官方旧 backend 做验收。
+- 正式记录真实数学课程 baseline：video/task ID、原始 Screenshot marker 数、最终截图数、未写完板书、必须保留的关键图。
+- 用约 7 分钟真实数学课程重新生成，目标最终截图 <= 6。
+- 人工核对：无连续重复图、明显减少未写完板书、关键题目/几何图/函数图/完整板书仍保留、LaTeX 完整度不下降。
+- 验证 general 模式无回归、Docker HTTP 200、data/config/static/models 持久化不受影响。
 
 Integration 约束：
 - WI-MATH-02/03/04 的核心逻辑可分别实现。
@@ -275,5 +279,5 @@ Codex Review 后如有 bounded findings，最多一次批量 pi_fix；不要一�
 - Docker HTTP 200。
 - data/config/static/models 持久化不受影响。
 
-请从 WI-MATH-05 — Math Prompt + UI Preset 开始工作。
+请从 WI-MATH-06 — Real Math Course Acceptance 开始工作。
 ```

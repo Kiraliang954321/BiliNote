@@ -1,6 +1,6 @@
 # BiliNote 数学课程模式改造设计
 
-> 状态：Design / 未实施
+> 状态：WI-MATH-05 已完成 / WI-MATH-06 待真实验收
 > 基线：`master@9ae7243`
 > 目标：为数学课程总结提供“公式优先、截图稀疏、完整板书优先”的专用模式，同时保持现有通用模式兼容。
 
@@ -1088,16 +1088,24 @@ WI-MATH-03 Stable Frame Selector
   checkpoint: 60f22c3
 WI-MATH-04 Perceptual Sampling Dedupe
   checkpoint: 81bc67d
+WI-MATH-05 Math Prompt + UI Preset
+  checkpoint: c4a56c5
 ```
 
-当前下一项已经确定，不重新做架构讨论：
+WI-MATH-05 已完成并通过 Codex Review：
+
+- `content_profile=math_course` 已透传到 Prompt 构建。
+- 普通公式、定义、推导优先 LaTeX/Markdown。
+- 只有启用 screenshot format 时才追加稀疏截图、完整板书、45s 间隔与代表 intent 规则。
+- math_course 未启用截图时不会注入 Screenshot marker 指令。
+- Web UI 仅显示 `math_course + academic` 推荐，不自动修改 style。
+- 最终验证：41 个相关 backend tests PASS，`py_compile` PASS，frontend production build PASS，`git diff --check` PASS。
+
+当前下一项已经确定，不重新做前五个 WorkItem：
 
 ```text
-WI-MATH-05 Math Prompt + UI Preset
 WI-MATH-06 Real Math Course Acceptance
 ```
-
-`WI-MATH-05` 只处理数学课程 Prompt 与 Web UI preset：让模型减少普通公式/推导截图、优先题目原图/几何图/函数图/关键完整板书，并保持 `content_profile` 与 `style` 独立；不得改变 `WI-MATH-02/03/04` 已冻结的后处理、稳定帧和视觉采样语义。
 
 Integration 注意：
 
@@ -1138,7 +1146,7 @@ G:\Project\bilinote
 G:\Project\bilinote\source
 
 当前分支：master
-当前实现 checkpoint：81bc67d
+当前实现 checkpoint：c4a56c5
 
 请先读取：
 G:\Project\bilinote\source\MATH_COURSE_MODE_DESIGN.md
@@ -1160,6 +1168,8 @@ G:\Project\bilinote\启动说明书.md
 5. WI-MATH-01 Content Profile Contract，checkpoint：4b5bf86。
 6. WI-MATH-02 Screenshot Intent Policy，checkpoint：8308296。
 7. WI-MATH-03 Stable Frame Selector，checkpoint：60f22c3。
+8. WI-MATH-04 Perceptual Sampling Dedupe，checkpoint：81bc67d。
+9. WI-MATH-05 Math Prompt + UI Preset，checkpoint：c4a56c5。
 
 原始数学截图问题：
 - 默认每 6 秒固定抽帧。
@@ -1185,8 +1195,8 @@ G:\Project\bilinote\启动说明书.md
 请继续遵循现有 Phase 20 / Codex-Pi 工作流：
 先调查真实磁盘/Git/容器状态；Codex 负责 Investigation/RCA/Architecture/Task Contract/Review/Integration；非平凡代码实现交给 pi_worker，禁止 blind retry。
 
-下一步已经确定：从 WI-MATH-05 — Math Prompt + UI Preset 开始，不要重新从头设计。
-WI-MATH-05 只处理 math_course Prompt 与 Web UI preset：减少普通公式/推导截图，优先完整题目原图、几何图、函数图和关键完整板书；content_profile 与 style 保持独立。不得改变 WI-MATH-02 ScreenshotPolicy、WI-MATH-03 StableFrameSelector、WI-MATH-04 感知采样去重语义。完成 Codex Review 后再进入 WI-MATH-06。
+下一步已经确定：直接进入 WI-MATH-06 — Real Math Course Acceptance，不要重新设计或实现 WI-MATH-01 ~ WI-MATH-05。
+WI-MATH-06 首先必须让运行中的 Docker backend 真正包含 WI-MATH-01 ~ WI-MATH-05，然后记录真实数学课程 baseline 并进行前后对照验收。
 
 最终验收目标：约 7 分钟数学课程最终截图 <= 6，避免连续重复和未写完板书，同时关键视觉内容保留，general 模式不回归。
 ```
