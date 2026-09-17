@@ -21,7 +21,7 @@ note_styles = [
 
 
 # 生成 BASE_PROMPT 函数
-def generate_base_prompt(title, segment_text, tags, _format=None, style=None, extras=None):
+def generate_base_prompt(title, segment_text, tags, _format=None, style=None, extras=None, content_profile="general"):
     # 生成 Base Prompt 开头部分
     prompt = BASE_PROMPT.format(
         video_title=title,
@@ -36,6 +36,26 @@ def generate_base_prompt(title, segment_text, tags, _format=None, style=None, ex
     # 根据用户选择的笔记风格添加描述
     if style:
         prompt += "\n" + get_style_format(style)
+
+    # 数学课程优先使用可编辑的公式文本，只在理解需要时保留稀疏的完整画面截图。
+    if content_profile == "math_course":
+        if _format and "screenshot" in _format:
+            prompt += '''
+
+### 数学课程截图与公式规则
+- 普通公式、定义和推导必须使用 LaTeX/Markdown 记录，不要用截图替代。
+- 截图主要用于完整题目图片、几何图形、函数/坐标图、关键完整板书，或确有必要的完整页推导。
+- 不要逐一枚举每个可见时间戳，也不要连续输出 Screenshot 标记；每个知识点一张代表性截图即可。
+- 优先选择书写完成后的画面；避免书写中、擦除中、翻页中或被遮挡的中间状态。
+- 截图通常至少间隔 45 秒，除非出现新的独立题目或图形。
+- 截图标记仍使用 `*Screenshot-[mm:ss]`。
+'''
+        else:
+            prompt += '''
+
+### 数学课程公式规则
+- 普通公式、定义和推导必须使用 LaTeX/Markdown 记录，不要用截图替代。
+'''
 
     # 添加额外内容
     if extras:

@@ -10,6 +10,10 @@ import types
 import unittest
 
 
+PROMPT_BUILDER_CALLS = []
+CHUNK_CALLS = []
+
+
 def _install_stubs():
     app_mod = types.ModuleType("app")
     gpt_pkg = types.ModuleType("app.gpt")
@@ -24,7 +28,8 @@ def _install_stubs():
 
     prompt_builder_mod = types.ModuleType("app.gpt.prompt_builder")
 
-    def _generate_base_prompt(**_kwargs):
+    def _generate_base_prompt(**kwargs):
+        PROMPT_BUILDER_CALLS.append(kwargs)
         return "PROMPT_BODY"
 
     prompt_builder_mod.generate_base_prompt = _generate_base_prompt
@@ -48,6 +53,12 @@ def _install_stubs():
     class _RequestChunker:
         def __init__(self, *_args, **_kwargs):
             pass
+
+        def chunk(self, segments, image_urls, **kwargs):
+            CHUNK_CALLS.append({"image_urls": image_urls, "kwargs": kwargs})
+            if image_urls:
+                raise ValueError("force fallback chunking")
+            return [types.SimpleNamespace(segments=segments, image_urls=image_urls)]
 
         def group_texts_by_budget(self, texts, _builder, **_kwargs):
             return [texts]
@@ -157,6 +168,34 @@ class TestCreateMessagesContentFormat(unittest.TestCase):
         import json
         serialized = json.dumps(messages, ensure_ascii=False)
         self.assertNotIn("image_url", serialized)
+
+    def test_forwards_content_profile_to_prompt_builder(self):
+        gpt = _make_gpt()
+        PROMPT_BUILDER_CALLS.clear()
+
+        gpt.create_messages(segments=[], content_profile="math_course")
+
+        self.assertEqual(PROMPT_BUILDER_CALLS[-1]["content_profile"], "math_course")
+
+    def test_summarize_forwards_profile_to_normal_and_fallback_chunking(self):
+        gpt = _make_gpt()
+        CHUNK_CALLS.clear()
+        gpt._chat_completion_create = lambda _messages: types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="summary"))]
+        )
+        source = types.SimpleNamespace(
+            screenshot=False, link=False, checkpoint_key=None, title="title", tags="tags",
+            _format=[], style="minimal", extras=None, content_profile="math_course",
+            video_img_urls=["https://example.test/image.jpg"],
+            segment=[types.SimpleNamespace(start=0, end=1, text="segment")],
+        )
+
+        self.assertEqual(gpt.summarize(source), "summary")
+        self.assertEqual(len(CHUNK_CALLS), 2)
+        self.assertTrue(CHUNK_CALLS[0]["image_urls"])
+        self.assertEqual(CHUNK_CALLS[0]["kwargs"]["content_profile"], "math_course")
+        self.assertEqual(CHUNK_CALLS[1]["image_urls"], [])
+        self.assertEqual(CHUNK_CALLS[1]["kwargs"]["content_profile"], "math_course")
 
 
 class TestBuildMergeMessagesContentFormat(unittest.TestCase):

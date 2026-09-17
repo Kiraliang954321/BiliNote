@@ -51,6 +51,7 @@ class UniversalGPT(GPT):
             _format=kwargs.get('_format'),
             style=kwargs.get('style'),
             extras=kwargs.get('extras'),
+            content_profile=kwargs.get('content_profile', 'general'),
         )
 
         video_img_urls = kwargs.get('video_img_urls', [])
@@ -287,7 +288,8 @@ class UniversalGPT(GPT):
                 tags=source.tags,
                 _format=source._format,
                 style=source.style,
-                extras=source.extras
+                extras=source.extras,
+                content_profile=source.content_profile
             )
         except ValueError:
             chunks = chunker.chunk(
@@ -297,7 +299,8 @@ class UniversalGPT(GPT):
                 tags=source.tags,
                 _format=source._format,
                 style=source.style,
-                extras=source.extras
+                extras=source.extras,
+                content_profile=source.content_profile
             )
 
         partials = []
@@ -317,7 +320,8 @@ class UniversalGPT(GPT):
                 video_img_urls=chunk.image_urls,
                 _format=source._format,
                 style=source.style,
-                extras=source.extras
+                extras=source.extras,
+                content_profile=source.content_profile
             )
             try:
                 response = self._chat_completion_create(messages)

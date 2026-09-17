@@ -159,6 +159,7 @@ const NoteForm = () => {
 
   /* ---- 派生状态（只 watch 一次，提高性能） ---- */
   const platform = useWatch({ control: form.control, name: 'platform' }) as string
+  const contentProfile = useWatch({ control: form.control, name: 'content_profile' })
   const videoUnderstandingEnabled = useWatch({ control: form.control, name: 'video_understanding' })
   const editing = currentTask && currentTask.id
 
@@ -501,6 +502,11 @@ const NoteForm = () => {
               </FormItem>
             )}
           />
+          {contentProfile === 'math_course' && (
+            <Alert className="text-sm">
+              <AlertDescription>数学课程推荐配合“学术”风格使用；当前风格不会自动更改。</AlertDescription>
+            </Alert>
+          )}
           {/* 视频理解 */}
           <SectionHeader title="视频理解" tip="将视频截图发给多模态模型辅助分析" />
           <div className="flex flex-col gap-2">
