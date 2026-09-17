@@ -11,6 +11,7 @@ from unittest.mock import patch
 _STUB_MODULE_NAMES = (
     "app",
     "app.utils",
+    "app.utils.frame_similarity",
     "app.utils.logger",
     "app.utils.path_helper",
     "ffmpeg",
@@ -47,6 +48,8 @@ def _install_stubs():
     logger_mod.get_logger = _get_logger
 
     path_helper_mod = types.ModuleType("app.utils.path_helper")
+    frame_similarity_mod = types.ModuleType("app.utils.frame_similarity")
+    frame_similarity_mod.frames_are_similar = lambda *_args: False
     ffmpeg_mod = types.ModuleType("ffmpeg")
 
     pil_mod = types.ModuleType("PIL")
@@ -88,6 +91,7 @@ def _install_stubs():
     sys.modules["PIL.ImageDraw"] = pil_draw_mod
     sys.modules["PIL.ImageFont"] = pil_font_mod
     sys.modules["ffmpeg"] = ffmpeg_mod
+    sys.modules["app.utils.frame_similarity"] = frame_similarity_mod
     sys.modules["app.utils.logger"] = logger_mod
     sys.modules["app.utils.path_helper"] = path_helper_mod
 
@@ -158,6 +162,58 @@ class TestVideoReaderDeduplicateFrames(unittest.TestCase):
 
             names = [pathlib.Path(p).name for p in paths]
             self.assertEqual(names, ["frame_00_00.jpg", "frame_00_02.jpg"])
+
+    def test_perceptual_mode_retains_latest_frame_of_adjacent_cluster(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reader = VideoReader(
+                video_path="dummy.mp4",
+                frame_interval=1,
+                frame_dir=str(pathlib.Path(tmp_dir) / "frames"),
+                grid_dir=str(pathlib.Path(tmp_dir) / "grids"),
+                dedupe_mode="perceptual_latest",
+            )
+            fake_colors = {second: f"frame-{second}".encode() for second in range(4)}
+
+            # Only chronological pairs 0~1 and 1~2 are one visual state.
+            similar_pairs = {("frame_00_00.jpg", "frame_00_01.jpg"), ("frame_00_01.jpg", "frame_00_02.jpg")}
+            def are_similar(previous, current):
+                return (pathlib.Path(previous).name, pathlib.Path(current).name) in similar_pairs
+
+            with patch.object(video_reader_module.ffmpeg, "probe", return_value={"format": {"duration": "4"}}), \
+                    patch.object(video_reader_module.subprocess, "run", side_effect=_make_fake_ffmpeg_runner(fake_colors)), \
+                    patch.object(video_reader_module, "frames_are_similar", side_effect=are_similar):
+                paths = reader.extract_frames(max_frames=10)
+
+            self.assertEqual(
+                [pathlib.Path(path).name for path in paths],
+                ["frame_00_02.jpg", "frame_00_03.jpg"],
+            )
+            self.assertFalse((pathlib.Path(reader.frame_dir) / "frame_00_00.jpg").exists())
+            self.assertFalse((pathlib.Path(reader.frame_dir) / "frame_00_01.jpg").exists())
+
+    def test_perceptual_similarity_failure_retains_frames_and_continues(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reader = VideoReader(
+                video_path="dummy.mp4",
+                frame_interval=1,
+                frame_dir=str(pathlib.Path(tmp_dir) / "frames"),
+                grid_dir=str(pathlib.Path(tmp_dir) / "grids"),
+                dedupe_mode="perceptual_latest",
+            )
+            fake_colors = {second: f"frame-{second}".encode() for second in range(3)}
+
+            with patch.object(video_reader_module.ffmpeg, "probe", return_value={"format": {"duration": "3"}}), \
+                    patch.object(video_reader_module.subprocess, "run", side_effect=_make_fake_ffmpeg_runner(fake_colors)), \
+                    patch.object(video_reader_module, "frames_are_similar", side_effect=RuntimeError("bad image")):
+                paths = reader.extract_frames(max_frames=10)
+
+            self.assertEqual(
+                [pathlib.Path(path).name for path in paths],
+                ["frame_00_00.jpg", "frame_00_01.jpg", "frame_00_02.jpg"],
+            )
+            self.assertTrue((pathlib.Path(reader.frame_dir) / "frame_00_00.jpg").exists())
+            self.assertTrue((pathlib.Path(reader.frame_dir) / "frame_00_01.jpg").exists())
+            self.assertTrue((pathlib.Path(reader.frame_dir) / "frame_00_02.jpg").exists())
 
 
 if __name__ == "__main__":

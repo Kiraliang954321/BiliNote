@@ -7,8 +7,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import ffmpeg
 from PIL import Image, ImageDraw, ImageFont
 
+from app.utils.frame_similarity import frames_are_similar
 from app.utils.logger import get_logger
 from app.utils.path_helper import get_app_dir
+
+
+EXACT_MD5_DEDUPE = "exact_md5"
+PERCEPTUAL_LATEST_DEDUPE = "perceptual_latest"
 
 logger = get_logger(__name__)
 class VideoReader:
@@ -22,11 +27,15 @@ class VideoReader:
                  save_quality=90,
                  font_path="fonts/arial.ttf",
                  frame_dir=None,
-                 grid_dir=None):
+                 grid_dir=None,
+                 dedupe_mode=EXACT_MD5_DEDUPE):
         self.video_path = video_path
         self.grid_size = grid_size
         self.frame_interval = frame_interval
         self.dedupe_enabled = dedupe_enabled
+        if dedupe_mode not in (EXACT_MD5_DEDUPE, PERCEPTUAL_LATEST_DEDUPE):
+            raise ValueError(f"Unsupported frame dedupe mode: {dedupe_mode}")
+        self.dedupe_mode = dedupe_mode
         self.unit_width = unit_width
         self.unit_height = unit_height
         self.save_quality = save_quality
@@ -86,17 +95,37 @@ class VideoReader:
             # 按时间戳顺序整理结果，并进行去重
             image_paths = []
             last_hash = None
+            previous_frame_path = None
             for ts in timestamps:
                 output_path = frame_results.get(ts)
                 if not output_path or not os.path.exists(output_path):
                     continue
 
-                if self.dedupe_enabled:
+                if self.dedupe_enabled and self.dedupe_mode == EXACT_MD5_DEDUPE:
                     frame_hash = self._calculate_file_md5(output_path)
                     if frame_hash == last_hash:
                         os.remove(output_path)
                         continue
                     last_hash = frame_hash
+                elif self.dedupe_enabled and self.dedupe_mode == PERCEPTUAL_LATEST_DEDUPE:
+                    # Deliberately compare only chronological neighbours.  Replacing
+                    # the previous kept path advances a similar-state cluster, so its
+                    # latest frame (rather than its first) remains available to AI.
+                    is_similar = False
+                    if previous_frame_path:
+                        try:
+                            is_similar = frames_are_similar(previous_frame_path, output_path)
+                        except Exception as error:
+                            logger.warning(
+                                "Perceptual frame similarity analysis failed; retaining both frames: %s",
+                                error,
+                            )
+                    if is_similar:
+                        image_paths.remove(previous_frame_path)
+                        os.remove(previous_frame_path)
+                    image_paths.append(output_path)
+                    previous_frame_path = output_path
+                    continue
 
                 image_paths.append(output_path)
             return image_paths

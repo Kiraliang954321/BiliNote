@@ -37,7 +37,7 @@ from app.utils.note_helper import replace_content_markers, prepend_source_link
 from app.utils.screenshot_marker import extract_screenshot_timestamps
 from app.utils.status_code import StatusCode
 from app.utils.video_helper import generate_screenshot, load_video_frame
-from app.utils.video_reader import VideoReader
+from app.utils.video_reader import EXACT_MD5_DEDUPE, PERCEPTUAL_LATEST_DEDUPE, VideoReader
 
 # ------------------ 环境变量与全局配置 ------------------
 
@@ -188,6 +188,7 @@ class NoteGenerator:
                 video_understanding=video_understanding,
                 video_interval=video_interval,
                 grid_size=grid_size,
+                content_profile=content_profile,
                 skip_download=not need_full_download,
             )
 
@@ -378,6 +379,7 @@ class NoteGenerator:
         video_understanding: bool,
         video_interval: int,
         grid_size: List[int],
+        content_profile: Literal["general", "math_course"] = "general",
         skip_download: bool = False,
     ) -> AudioDownloadResult | None:
         """
@@ -451,6 +453,11 @@ class NoteGenerator:
                         unit_width=960,
                         unit_height=540,
                         save_quality=80,
+                        dedupe_mode=(
+                            PERCEPTUAL_LATEST_DEDUPE
+                            if content_profile == "math_course"
+                            else EXACT_MD5_DEDUPE
+                        ),
                     ).run()
                 else:
                     logger.info("未指定 grid_size，跳过缩略图生成")
