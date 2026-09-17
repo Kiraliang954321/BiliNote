@@ -690,3 +690,501 @@ WI-MATH-01 Contract
 数学课程模式最终应做到：
 
 > **让 AI 看得足够多，但让笔记只留下真正值得看的图。**
+
+---
+
+## 16. 当前项目接续上下文（2026-09-17）
+
+本节用于在新聊天中快速恢复项目状态。以下内容基于当前磁盘、Git 与 Docker 状态整理。
+
+### 16.1 已完成内容
+
+#### A. BiliNote Docker 部署
+
+部署根目录：
+
+```text
+G:\Project\bilinote
+```
+
+当前运行方式：
+
+```text
+Docker Desktop
+→ docker-compose.yml
+→ ghcr.io/jefferyhcool/bilinote:latest
+→ localhost:3015
+```
+
+当前容器：
+
+```text
+container: bilinote
+port: 3015 -> 80
+restart: unless-stopped
+```
+
+持久化目录：
+
+```text
+G:\Project\bilinote\data
+G:\Project\bilinote\config
+G:\Project\bilinote\static
+G:\Project\bilinote\models
+```
+
+已经创建中文启动说明：
+
+```text
+G:\Project\bilinote\启动说明书.md
+```
+
+#### B. 数学公式渲染修复
+
+已确认原问题不是字符编码问题，而是 Markdown/LaTeX 渲染链路不完整：
+
+- 主笔记原本能处理 `$...$` / `$$...$$`，但生成内容经常使用 `\(...\)` / `\[...\]`。
+- AI 问答区原本只有 `remark-gfm`，没有数学渲染插件。
+
+已完成本地前端修复：
+
+- `\(...\)` 转换为 `$...$`
+- `\[...\]` 转换为 `$$...$$`
+- AI 问答启用 `remark-math + rehype-katex`
+- 转换只发生在显示阶段，不修改保存的原始 Markdown
+
+源码 Git checkpoint：
+
+```text
+9ae7243 fix(frontend): render LaTeX math in notes and chat
+```
+
+修复版前端构建输出：
+
+```text
+G:\Project\bilinote\frontend-dist
+```
+
+Docker 当前通过只读挂载覆盖官方镜像内前端：
+
+```yaml
+- ./frontend-dist:/usr/share/nginx/html:ro
+```
+
+部署前 Compose 备份：
+
+```text
+G:\Project\bilinote\docker-compose.yml.bak-before-mathfix
+```
+
+已验证：
+
+- 前端 build 成功
+- 数学测试笔记成功生成 KaTeX 节点
+- Docker 容器正常运行
+- `http://localhost:3015` 返回 HTTP 200
+- `data/config/static/models` 持久化目录未受影响
+
+#### C. 数学课程截图问题调查
+
+已用真实数学课程输出确认：
+
+- 当前 `VideoReader` 按固定 `video_interval` 抽帧，默认 6 秒。
+- 当前去重仅比较 JPG 文件 MD5，只有完全相同文件才去重。
+- Screenshot Prompt 没有截图密度、板书完整度、相邻截图最小间隔等约束。
+- `_insert_screenshots()` 会直接在 AI marker 指定时间截帧，没有稳定帧搜索。
+- 一段约 7 分钟数学视频实际生成约 72 个 Screenshot marker，基本逐 6 秒枚举。
+- AI 常输出 `*Screenshot-[mm:ss]*`，当前 marker parser 不能完整消费尾部 `*`，会在页面留下孤立星号。
+
+#### D. 数学课程模式设计
+
+完整设计已经完成并冻结在本文件中。
+
+本地 Git checkpoint：
+
+```text
+1ac97e0 docs(math-course): design screenshot strategy
+```
+
+目前只完成设计，没有实施数学课程模式生产代码。
+
+---
+
+### 16.2 当前架构
+
+#### 部署层
+
+```text
+G:\Project\bilinote
+├─ docker-compose.yml
+├─ frontend-dist/          # 本地修复版前端，挂载覆盖官方镜像前端
+├─ data/                   # 数据库、note_results 等
+├─ config/
+├─ static/
+├─ models/
+├─ source/                 # BiliNote 官方源码 clone + 本地 Git 修改
+└─ 启动说明书.md
+```
+
+重要：
+
+```text
+G:\Project\bilinote
+```
+
+根目录本身不是 Git 仓库。
+
+真正的 Git 仓库是：
+
+```text
+G:\Project\bilinote\source
+```
+
+当前分支：
+
+```text
+master
+```
+
+数学课程模式设计冻结 checkpoint：
+
+```text
+1ac97e0
+```
+
+新聊天开始时应重新执行 `git rev-parse HEAD` 与 `git status --short`，不要假设当前 HEAD 永远停留在该 checkpoint。
+
+#### 当前生产运行结构
+
+```text
+官方 BiliNote Docker 镜像
+│
+├─ 官方 backend
+│
+├─ 官方 nginx
+│
+└─ /usr/share/nginx/html
+       ▲
+       │ read-only bind mount
+       │
+G:\Project\bilinote\frontend-dist
+       │
+       └─ 本地数学公式前端修复
+```
+
+所以当前部署属于：
+
+```text
+官方后端 + 本地前端覆盖层
+```
+
+目前还没有把 `source/backend` 的自定义后端代码部署进生产容器。
+
+#### 当前截图链路
+
+```text
+video_interval 固定抽帧
+→ VideoReader
+→ grid_size 拼图
+→ UniversalGPT 多模态输入
+→ Prompt 让 AI 输出 Screenshot-[mm:ss]
+→ NoteGenerator._post_process_markdown()
+→ _insert_screenshots()
+→ generate_screenshot() 精确时间截帧
+→ Markdown 插图
+```
+
+#### 目标数学模式架构
+
+```text
+Visual Context Sampling
+→ Screenshot Intent Selection
+→ ScreenshotPolicy
+→ StableFrameSelector
+→ 最终截图
+```
+
+即：
+
+```text
+AI 看多少帧 ≠ 最终笔记放多少图
+AI 指定的大致时间 ≠ 最终实际截帧时间
+```
+
+---
+
+### 16.3 已确认决策
+
+1. 新增独立 `content_profile`，不把数学逻辑塞进 `style`。
+
+```text
+general
+math_course
+```
+
+默认必须是：
+
+```text
+general
+```
+
+保证旧客户端和现有行为兼容。
+
+2. 推荐数学课程组合：
+
+```text
+content_profile = math_course
+style = academic
+```
+
+3. 数学公式与普通推导优先用 LaTeX/Markdown，截图只用于真正需要视觉信息的内容：
+
+- 完整题目原图
+- 几何图
+- 函数图/坐标图
+- 关键完整板书
+- 有必要保留布局的一整页推导
+
+4. 视觉采样与最终截图密度解耦。数学模式可继续用约 6 秒采样给 AI 看，但最终截图应稀疏。
+
+5. 数学模式默认截图策略设计为：
+
+```text
+analysis sample interval: 6s
+final screenshot min gap: 45s
+stable search before: 2s
+stable search after: 8s
+stable sample step: 1s
+```
+
+6. ScreenshotPolicy 必须是确定性安全层，不能只依赖 Prompt。
+
+它至少负责：
+
+- marker normalization
+- 连续 marker run collapse
+- 最小时间间隔
+- 全局截图数量 hard cap
+
+7. 连续截图枚举在数学板书场景中优先保留较晚 intent，因为通常较晚帧板书更完整。
+
+8. 全局截图上限设计：
+
+```text
+max_screenshots = clamp(ceil(video_duration / 75s), 1, 10)
+```
+
+约 7 分钟样本目标为最终不超过约 6 张关键截图。
+
+9. StableFrameSelector 不引入 OpenCV。首版使用项目已有：
+
+```text
+Pillow
+numpy
+ffmpeg
+```
+
+分析：
+
+- 帧间 motion delta
+- dHash
+- sharpness
+- scene cut
+
+10. StableFrameSelector 失败时必须 fail-closed：
+
+```text
+fallback → 原 Screenshot intent timestamp
+```
+
+不得因为智能选帧失败而让整份笔记失败。
+
+11. 感知去重首版必须保守，只比较相邻帧；相似帧簇保留最后状态，而不是第一张。
+
+12. 首版明确不做：
+
+- OCR 板书识别
+- YOLO/黑板检测模型
+- 训练“是否写完”分类模型
+- 数据库截图策略配置表
+- 自动学科识别
+- 旧笔记批量重写
+
+13. 实施继续遵循 Phase 20 / Codex-Pi 工作流：
+
+```text
+Codex Investigation / RCA / Architecture / Task Contract
+→ Pi bounded implementation
+→ Pi focused self-test
+→ Codex Review
+→ 必要时一次 batched pi_fix
+→ Codex Integration / Acceptance
+```
+
+---
+
+### 16.4 尚未解决的问题
+
+#### A. 数学课程模式尚未实现
+
+目前 `content_profile=math_course` 只是设计，没有代码实现。
+
+#### B. 后端自定义代码的部署方式尚未最终决定
+
+当前 Docker 使用官方镜像，只覆盖前端。
+
+数学课程模式会修改 backend，因此实施完成后必须在 Integration 前明确选择一种后端部署方式，例如：
+
+```text
+方案 1：基于 source 构建本地完整 Docker 镜像
+方案 2：开发阶段 bind mount 后端源码，稳定后再固化镜像
+```
+
+生产验收前必须避免“源码已经改了，但容器仍运行官方 backend”的假完成状态。
+
+#### C. 感知相似度阈值尚未用真实样本校准
+
+设计已有算法方向，但以下阈值需要真实数学视频回归确定：
+
+- dHash distance
+- mean pixel delta
+- scene-cut threshold
+- settled motion threshold
+- sharpness 权重
+
+#### D. Screenshot hard cap 的章节公平策略尚需实施细化
+
+设计要求超过上限时优先保留不同章节代表图，而不是简单取前 N 张；具体 deterministic 分配算法还需在 WI-MATH-02 实现时冻结。
+
+#### E. 当前真实样本的人工验收基线还需正式记录
+
+已有约 7 分钟 / 72 Screenshot marker 的失败样本，但实施阶段应记录：
+
+- 视频 ID / task ID
+- 原始 marker 数
+- 最终截图数
+- 哪些截图属于“未写完板书”
+- 哪些图必须保留
+
+用于 WI-MATH-06 前后对照。
+
+#### F. Browser extension 是否同步支持 `content_profile`
+
+首轮 Web UI 是主要使用入口。浏览器插件是否同步增加“数学课程”选项可后续决定；但 backend API 必须允许旧插件不传该字段。
+
+---
+
+### 16.5 下一步计划
+
+按当前冻结设计，下一步不要重新做架构讨论，直接从 `WI-MATH-01` 开始。
+
+#### WI-MATH-01 — Content Profile Contract
+
+目标：
+
+```text
+新增 content_profile=general|math_course
+默认 general
+完成 Web UI → API → backend → NoteGenerator → GPT/source identity 的透传
+本 WorkItem 不改变截图行为
+```
+
+完成并 Review 后依次推进：
+
+```text
+WI-MATH-02 Screenshot Intent Policy
+WI-MATH-03 Stable Frame Selector
+WI-MATH-04 Perceptual Sampling Dedupe
+WI-MATH-05 Math Prompt + UI Preset
+WI-MATH-06 Real Math Course Acceptance
+```
+
+Integration 注意：
+
+- `WI-MATH-02/03/04` 的核心逻辑可独立实现。
+- 它们都会接入 `backend/app/services/note.py`，共享文件 Integration 必须串行。
+- Pi 调度服从单 active mutation gate，不能并发修改同一工作区。
+
+最终真实验收目标：
+
+```text
+当前失败基线：约 7 分钟课程 / 72 Screenshot intents
+目标：最终截图 <= 6
+```
+
+并同时满足：
+
+- 没有连续重复截图
+- 明显减少“公式只写了一半”的截图
+- 关键题目、几何图、完整板书仍保留
+- LaTeX 笔记完整度不下降
+- general 模式无回归
+- Docker HTTP 200
+- data/config/static/models 持久化不受影响
+
+---
+
+## 17. 新聊天直接接续提示词
+
+下面内容可以直接复制到一个新聊天：
+
+```text
+继续我的 BiliNote 本地改造项目。
+
+项目位置：
+G:\Project\bilinote
+
+源码 Git 仓库：
+G:\Project\bilinote\source
+
+当前分支：master
+当前设计基线 HEAD：1ac97e0
+
+请先读取：
+G:\Project\bilinote\source\MATH_COURSE_MODE_DESIGN.md
+以及：
+G:\Project\bilinote\启动说明书.md
+
+当前 Docker 部署：
+- 使用 ghcr.io/jefferyhcool/bilinote:latest
+- 访问 http://localhost:3015
+- data/config/static/models 均持久化在 G:\Project\bilinote
+- frontend-dist 以只读 volume 覆盖官方前端
+- 当前后端仍是官方镜像内 backend
+
+已经完成：
+1. BiliNote Docker 部署。
+2. 数学公式渲染修复：兼容 \(...\)、\[...\]，AI 问答启用 remark-math + rehype-katex。
+3. 公式修复源码 checkpoint：9ae7243。
+4. 数学课程截图问题 RCA 和完整设计。
+5. 数学模式设计 checkpoint：1ac97e0。
+
+已确认数学截图问题：
+- 默认每 6 秒固定抽帧。
+- 去重仅 MD5 exact match。
+- Screenshot Prompt 没有密度/完整板书约束。
+- 最终截图机械使用 AI 指定的精确时间。
+- 实际约 7 分钟课程曾生成约 72 个 Screenshot marker。
+- *Screenshot-[mm:ss]* 尾部星号存在 parser 遗留问题。
+
+冻结设计：
+- 新增 content_profile=general|math_course，默认 general。
+- math_course 推荐与 style=academic 组合。
+- AI 视觉采样与最终截图密度解耦。
+- 新增 ScreenshotPolicy：marker normalization、连续 run collapse、45s min gap、hard cap。
+- hard cap 设计：clamp(ceil(video_duration/75s), 1, 10)。
+- 新增 StableFrameSelector，在 Screenshot intent 附近搜索完整稳定板书。
+- 首版只用 Pillow + numpy + ffmpeg，不引入 OpenCV。
+- selector 失败回退原 timestamp。
+- 新增保守感知去重，相似簇保留最后帧。
+
+首版不做：OCR、YOLO、训练视觉分类器、自动学科识别、数据库策略表、旧笔记批量重写。
+
+请继续遵循现有 Phase 20 / Codex-Pi 工作流：
+先调查真实磁盘/Git/容器状态；Codex 负责 Investigation/RCA/Architecture/Task Contract/Review/Integration；非平凡代码实现交给 pi_worker，禁止 blind retry。
+
+下一步已经确定：从 WI-MATH-01 — Content Profile Contract 开始，不要重新从头设计。
+WI-MATH-01 只完成 content_profile 的前后端透传和兼容契约，不改变截图行为。完成 Codex Review 后再进入 WI-MATH-02。
+
+最终验收目标：约 7 分钟数学课程最终截图 <= 6，避免连续重复和未写完板书，同时关键视觉内容保留，general 模式不回归。
+```
