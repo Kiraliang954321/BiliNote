@@ -5,6 +5,18 @@
 export function normalizeMathDelimiters(markdown: string): string {
   const normalizeText = (text: string) =>
     text
+      .replace(
+        /^([ \t]*)\\\[[ \t]*\r?\n([\s\S]*?)^[ \t]*\\\][ \t]*(?=\r?\n|$)/gm,
+        (_match, indent: string, math: string) => {
+          const body = math
+            .replace(/\r?\n$/, '')
+            .split(/\r?\n/)
+            .map((line) => (line === '' || line.startsWith(indent) ? line : `${indent}${line}`))
+            .join('\n')
+
+          return `${indent}$$\n${body}\n${indent}$$`
+        },
+      )
       .replace(/\\\[([\s\S]*?)\\\]/g, (_match, math: string) => `$$${math}$$`)
       .replace(/\\\(([\s\S]*?)\\\)/g, (_match, math: string) => `$${math}$`)
 
