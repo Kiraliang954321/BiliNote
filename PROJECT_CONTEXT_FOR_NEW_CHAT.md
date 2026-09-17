@@ -2,7 +2,7 @@
 
 > 用途：把本文件内容直接复制到新的 ChatGPT 对话中，即可继续当前项目。
 > 整理时间：2026-09-17
-> 数学课程模式设计冻结 checkpoint：`1ac97e0`
+> 数学课程模式当前实现 checkpoint：`60f22c3`
 > 新聊天开始后必须重新核对真实 Git / Docker 状态，不要只依赖本文件中的时间点信息。
 
 ## 可直接复制到新聊天
@@ -14,7 +14,7 @@
 部署根目录：G:\Project\bilinote
 源码 Git 仓库：G:\Project\bilinote\source
 Git 分支：master
-数学课程模式设计冻结 checkpoint：1ac97e0
+数学课程模式当前实现 checkpoint：60f22c3
 
 新聊天开始后，请先真实执行：
 - git status --short
@@ -69,6 +69,28 @@ Git 分支：master
    设计 checkpoint：
    1ac97e0 docs(math-course): design screenshot strategy
 
+6. 已完成 WI-MATH-01 — Content Profile Contract。
+   - 新增 content_profile=general|math_course，默认 general。
+   - Web UI → API → backend → NoteGenerator → GPT/source identity 已完成透传。
+   - checkpoint：4b5bf86 feat(math-course): add content profile contract
+
+7. 已完成 WI-MATH-02 — Screenshot Intent Policy。
+   - marker normalization 已完整消费 `*Screenshot-[mm:ss]*`。
+   - math_course 连续 marker run 保留较晚 intent。
+   - 同语义单元应用 45s min-gap。
+   - hard cap = clamp(ceil(video_duration/75s), 1, 10)。
+   - 超限时按章节代表 + 时间分布做 deterministic allocation，不简单取前 N 张。
+   - checkpoint：8308296 feat(math-course): add screenshot intent policy
+
+8. 已完成 WI-MATH-03 — Stable Frame Selector。
+   - 搜索窗口 intent-2s 到 intent+8s，1s 采样。
+   - 320x180 灰度分析；settled motion threshold=0.03；scene-cut threshold=0.18。
+   - 选择优先级：settled → 更低 motion → 更高清晰度 → 更晚 timestamp。
+   - forward scene cut 后不跨到下一页。
+   - selector 失败回退原 intent timestamp；general 不做稳定帧搜索。
+   - 22 个 focused/compatibility tests PASS。
+   - checkpoint：60f22c3 feat(math-course): add stable frame selector
+
 【当前架构】
 部署目录本身不是 Git 仓库：
 G:\Project\bilinote
@@ -84,23 +106,19 @@ Docker official image
      ↑
      └─ G:\Project\bilinote\frontend-dist (read-only bind mount)
 
-当前截图生成链路：
+当前源码中的 math_course 最终截图链路：
 video_interval 固定抽帧
 → VideoReader
 → grid_size 拼图
 → UniversalGPT 多模态输入
-→ Prompt 输出 Screenshot-[mm:ss]
+→ Prompt 输出 Screenshot intent
 → NoteGenerator._post_process_markdown()
-→ _insert_screenshots()
-→ generate_screenshot() 精确时间截帧
+→ ScreenshotPolicy（run collapse / 45s min-gap / hard cap）
+→ StableFrameSelector（intent 邻域 settled frame 搜索）
+→ generate_screenshot() 使用选定 timestamp
 → Markdown 插图
 
-目标数学模式架构：
-Visual Context Sampling
-→ Screenshot Intent Selection
-→ ScreenshotPolicy
-→ StableFrameSelector
-→ 最终截图
+注意：上述后端源码链路尚未部署到当前官方 backend 容器；当前生产容器仍运行官方 backend。
 
 核心原则：
 AI 看多少帧 ≠ 最终笔记放多少图。
@@ -158,11 +176,12 @@ AI 指定的大致时间 ≠ 最终实际截帧时间。
     - Pillow
     - numpy
     - ffmpeg
-    分析：
+    当前 selector 分析：
     - motion delta
-    - dHash
     - sharpness
     - scene cut
+    参数：320x180 灰度、settled motion threshold=0.03、scene-cut threshold=0.18。
+    dHash 留到 WI-MATH-04 的视觉采样感知去重，不混入最终截帧选择。
 
 11. StableFrameSelector 失败时必须 fallback 到原 Screenshot intent timestamp，不能让整份笔记失败。
 
@@ -177,48 +196,50 @@ AI 指定的大致时间 ≠ 最终实际截帧时间。
     - 旧笔记批量重写
 
 【尚未解决的问题】
-1. content_profile=math_course 尚未实现，目前只有设计。
-
-2. 后端自定义代码的生产部署方式还未最终冻结。
+1. 后端自定义代码的生产部署方式还未最终冻结。
    当前 Docker 仍使用官方 backend，只覆盖前端。
-   数学课程模式会修改 backend，因此 Integration 前必须明确：
+   `WI-MATH-01/02/03` 已在源码仓库实现，但当前生产容器尚未运行这些 backend 改动。
+   后续 Integration 必须明确：
    - 构建本地完整 Docker 镜像；或
    - 开发阶段 bind mount backend，稳定后再固化镜像。
    必须避免“source/backend 已改，但生产容器仍跑官方 backend”的假完成。
 
-3. 感知相似度与稳定帧阈值尚未使用真实数学样本校准：
+2. 感知相似度与稳定帧阈值尚未使用真实数学样本校准。
+   StableFrameSelector 当前工程阈值：
+   - scene-cut threshold = 0.18
+   - settled motion threshold = 0.03
+   WI-MATH-04 还需冻结：
    - dHash distance
    - mean pixel delta
-   - scene-cut threshold
-   - settled motion threshold
-   - sharpness 权重
 
-4. Screenshot hard cap 超限时的“章节公平分配”算法还需在 WI-MATH-02 中最终冻结。
+3. Windows 主机当前 PATH 中没有 ffmpeg。
+   - Pillow/numpy 可用。
+   - backend/Dockerfile 与 Dockerfile.complete 已安装 ffmpeg。
+   - 因此 synthetic tests 可执行，但真实视频现场验证应在带 ffmpeg 的运行环境完成。
 
-5. 真实 E2E 验收样本应正式记录 task/video baseline，包含：
+4. 真实 E2E 验收样本应正式记录 task/video baseline，包含：
    - 原 marker 数
    - 最终截图数
    - 哪些属于未写完板书
    - 哪些关键图必须保留
 
-6. Browser extension 是否同步支持 content_profile 可后续决定，但 backend 必须兼容旧插件不传字段。
+5. Browser extension 是否同步支持 content_profile 可后续决定；backend 已兼容旧插件不传字段时默认 general。
 
 【下一步计划】
 不要重新做架构设计，直接从：
-WI-MATH-01 — Content Profile Contract
+WI-MATH-04 — Perceptual Sampling Dedupe
 开始。
 
-WI-MATH-01 目标：
-- 新增 content_profile=general|math_course。
-- 默认 general。
-- 完成 Web UI → API → backend → NoteGenerator → GPT/source identity 的透传。
-- 本 WorkItem 不改变截图行为。
-- general 必须保持当前行为。
+WI-MATH-04 目标：
+- 只改给 AI 的 Visual Context Sampling 去重。
+- 使用保守的相邻感知相似度，而不是 JPG MD5 exact match。
+- 相似 visual-state cluster 保留最后一张，而不是第一张。
+- 冻结 dHash distance / mean pixel delta 首版阈值，并集中配置。
+- general 必须保持原有采样行为。
+- 不改变 WI-MATH-02 最终截图 hard cap/min-gap。
+- 不改变 WI-MATH-03 StableFrameSelector 的最终截帧语义。
 
 后续顺序：
-WI-MATH-02 — Screenshot Intent Policy
-WI-MATH-03 — Stable Frame Selector
-WI-MATH-04 — Perceptual Sampling Dedupe
 WI-MATH-05 — Math Prompt + UI Preset
 WI-MATH-06 — Real Math Course Acceptance
 
@@ -245,5 +266,5 @@ Codex Review 后如有 bounded findings，最多一次批量 pi_fix；不要一�
 - Docker HTTP 200。
 - data/config/static/models 持久化不受影响。
 
-请从 WI-MATH-01 开始工作。
+请从 WI-MATH-04 — Perceptual Sampling Dedupe 开始工作。
 ```

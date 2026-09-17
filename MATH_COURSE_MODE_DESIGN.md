@@ -1025,38 +1025,39 @@ Codex Investigation / RCA / Architecture / Task Contract
 
 ### 16.4 尚未解决的问题
 
-#### A. 数学课程模式尚未实现
-
-目前 `content_profile=math_course` 只是设计，没有代码实现。
-
-#### B. 后端自定义代码的部署方式尚未最终决定
+#### A. 后端自定义代码的部署方式尚未最终决定
 
 当前 Docker 使用官方镜像，只覆盖前端。
 
-数学课程模式会修改 backend，因此实施完成后必须在 Integration 前明确选择一种后端部署方式，例如：
+`WI-MATH-01/02/03` 已经在源码仓库实现并通过 Codex Review，但当前运行容器仍是官方 backend，因此生产验收前必须明确选择一种后端部署方式，例如：
 
 ```text
 方案 1：基于 source 构建本地完整 Docker 镜像
 方案 2：开发阶段 bind mount 后端源码，稳定后再固化镜像
 ```
 
-生产验收前必须避免“源码已经改了，但容器仍运行官方 backend”的假完成状态。
+必须避免“source/backend 已改，但容器仍运行官方 backend”的假完成状态。
 
-#### C. 感知相似度阈值尚未用真实样本校准
+#### B. 感知相似度与稳定帧阈值尚未用真实样本校准
 
-设计已有算法方向，但以下阈值需要真实数学视频回归确定：
+`WI-MATH-03` 已冻结并实现首版 selector 参数：
 
-- dHash distance
-- mean pixel delta
-- scene-cut threshold
-- settled motion threshold
-- sharpness 权重
+```text
+stable search before: 2s
+stable search after: 8s
+stable sample step: 1s
+settled motion threshold: 0.03
+scene-cut threshold: 0.18
+analysis size: 320x180 grayscale
+```
 
-#### D. Screenshot hard cap 的章节公平策略尚需实施细化
+这些仍属于首版工程阈值，需要在真实数学视频回归中校准；`WI-MATH-04` 还需冻结并校准 dHash distance / mean pixel delta 等感知去重阈值。
 
-设计要求超过上限时优先保留不同章节代表图，而不是简单取前 N 张；具体 deterministic 分配算法还需在 WI-MATH-02 实现时冻结。
+#### C. Windows 主机当前 PATH 中没有 ffmpeg
 
-#### E. 当前真实样本的人工验收基线还需正式记录
+本地 Python 环境已有 Pillow/numpy，但当前 Windows 主机直接执行 `ffmpeg` 不可用。项目 Dockerfile 已明确安装 ffmpeg，因此该问题不阻断源码实现和 synthetic tests；真实视频现场验证应在带 ffmpeg 的运行环境中完成，并纳入 `WI-MATH-06`。
+
+#### D. 当前真实样本的人工验收基线还需正式记录
 
 已有约 7 分钟 / 72 Screenshot marker 的失败样本，但实施阶段应记录：
 
@@ -1068,36 +1069,34 @@ Codex Investigation / RCA / Architecture / Task Contract
 
 用于 WI-MATH-06 前后对照。
 
-#### F. Browser extension 是否同步支持 `content_profile`
+#### E. Browser extension 是否同步支持 `content_profile`
 
-首轮 Web UI 是主要使用入口。浏览器插件是否同步增加“数学课程”选项可后续决定；但 backend API 必须允许旧插件不传该字段。
+首轮 Web UI 是主要使用入口。浏览器插件是否同步增加“数学课程”选项可后续决定；但 backend API 已保持旧插件不传该字段时默认 `general`。
 
 ---
 
 ### 16.5 下一步计划
 
-按当前冻结设计，下一步不要重新做架构讨论，直接从 `WI-MATH-01` 开始。
-
-#### WI-MATH-01 — Content Profile Contract
-
-目标：
+当前已完成并通过 Codex Review：
 
 ```text
-新增 content_profile=general|math_course
-默认 general
-完成 Web UI → API → backend → NoteGenerator → GPT/source identity 的透传
-本 WorkItem 不改变截图行为
+WI-MATH-01 Content Profile Contract
+  checkpoint: 4b5bf86
+WI-MATH-02 Screenshot Intent Policy
+  checkpoint: 8308296
+WI-MATH-03 Stable Frame Selector
+  checkpoint: 60f22c3
 ```
 
-完成并 Review 后依次推进：
+当前下一项已经确定，不重新做架构讨论：
 
 ```text
-WI-MATH-02 Screenshot Intent Policy
-WI-MATH-03 Stable Frame Selector
 WI-MATH-04 Perceptual Sampling Dedupe
 WI-MATH-05 Math Prompt + UI Preset
 WI-MATH-06 Real Math Course Acceptance
 ```
+
+`WI-MATH-04` 只处理给 AI 的视觉采样相邻感知去重：使用保守阈值识别相似 visual-state cluster，并保留簇中较晚帧；不得改变 `WI-MATH-02` 最终截图密度策略，也不得修改 `WI-MATH-03` StableFrameSelector 的最终截帧选择语义。
 
 Integration 注意：
 
@@ -1138,7 +1137,7 @@ G:\Project\bilinote
 G:\Project\bilinote\source
 
 当前分支：master
-当前设计基线 HEAD：1ac97e0
+当前实现 checkpoint：60f22c3
 
 请先读取：
 G:\Project\bilinote\source\MATH_COURSE_MODE_DESIGN.md
@@ -1156,16 +1155,18 @@ G:\Project\bilinote\启动说明书.md
 1. BiliNote Docker 部署。
 2. 数学公式渲染修复：兼容 \(...\)、\[...\]，AI 问答启用 remark-math + rehype-katex。
 3. 公式修复源码 checkpoint：9ae7243。
-4. 数学课程截图问题 RCA 和完整设计。
-5. 数学模式设计 checkpoint：1ac97e0。
+4. 数学课程截图问题 RCA 和完整设计，设计 checkpoint：1ac97e0。
+5. WI-MATH-01 Content Profile Contract，checkpoint：4b5bf86。
+6. WI-MATH-02 Screenshot Intent Policy，checkpoint：8308296。
+7. WI-MATH-03 Stable Frame Selector，checkpoint：60f22c3。
 
-已确认数学截图问题：
+原始数学截图问题：
 - 默认每 6 秒固定抽帧。
 - 去重仅 MD5 exact match。
 - Screenshot Prompt 没有密度/完整板书约束。
-- 最终截图机械使用 AI 指定的精确时间。
+- 最终截图曾机械使用 AI 指定的精确时间。
 - 实际约 7 分钟课程曾生成约 72 个 Screenshot marker。
-- *Screenshot-[mm:ss]* 尾部星号存在 parser 遗留问题。
+- `*Screenshot-[mm:ss]*` 尾部星号 parser 遗留问题已在 WI-MATH-02 修复。
 
 冻结设计：
 - 新增 content_profile=general|math_course，默认 general。
@@ -1183,8 +1184,8 @@ G:\Project\bilinote\启动说明书.md
 请继续遵循现有 Phase 20 / Codex-Pi 工作流：
 先调查真实磁盘/Git/容器状态；Codex 负责 Investigation/RCA/Architecture/Task Contract/Review/Integration；非平凡代码实现交给 pi_worker，禁止 blind retry。
 
-下一步已经确定：从 WI-MATH-01 — Content Profile Contract 开始，不要重新从头设计。
-WI-MATH-01 只完成 content_profile 的前后端透传和兼容契约，不改变截图行为。完成 Codex Review 后再进入 WI-MATH-02。
+下一步已经确定：从 WI-MATH-04 — Perceptual Sampling Dedupe 开始，不要重新从头设计。
+WI-MATH-04 只处理给 AI 的视觉采样相邻感知去重：保守判断相似 visual-state cluster，并保留较晚帧；不得改变 WI-MATH-02 最终截图 hard-cap/min-gap 逻辑，也不得改变 WI-MATH-03 StableFrameSelector 的最终截帧语义。完成 Codex Review 后再进入 WI-MATH-05。
 
 最终验收目标：约 7 分钟数学课程最终截图 <= 6，避免连续重复和未写完板书，同时关键视觉内容保留，general 模式不回归。
 ```
